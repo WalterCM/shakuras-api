@@ -1,0 +1,22 @@
+{% extends "admin/change_list.html" %}
+
+{% block content %}
+  <style>
+    .custom-button {
+      float: none !important;
+    }
+  </style>
+
+  {% if show_generate_players_input %}
+    <form method="POST" action="">
+      {% csrf_token %}
+      <div class="submit-row">
+        <label for="id_number_of_players">Number of Players: </label>
+        <input type="number" name="number_of_players" id="id_number_of_players" required min="1">
+        <input type="submit" class="default custom-button" name="generate_players" value="Generate Players">
+      </div>
+    </form>
+    <br />
+  {% endif %}
+  {{ block.super }}
+{% endblock %}

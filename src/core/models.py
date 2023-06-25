@@ -5,6 +5,7 @@ from users.models import UserManager as BaseUserManager
 
 
 from faker import Faker
+from faker.providers import BaseProvider
 
 
 class UserManager(BaseUserManager):
@@ -48,6 +49,14 @@ class User(AbstractUser):
         )
 
 
+class CustomWordProvider(BaseProvider):
+    def word_with_min_length(self, min_length):
+        word = self.generator.word()
+        while len(word) < min_length:
+            word = self.generator.word()
+        return word
+
+
 class PlayerManager(models.Manager):
     def generate_player(self, nickname=None):
         import random
@@ -60,6 +69,7 @@ class PlayerManager(models.Manager):
         weighted_locales = [(country, locale) for country, locale, weight in locales for _ in range(weight)]
         country, locale = random.choices(weighted_locales)[0]
         fake = Faker(locale)
+        fake.add_provider(CustomWordProvider)
 
         t = Transliterator()
         name = fake.name()
@@ -76,7 +86,7 @@ class PlayerManager(models.Manager):
         payload = {
             'first_name': first_name,
             'last_name': last_name,
-            'nickname': nickname or fake.word().capitalize(),
+            'nickname': nickname or fake.word_with_min_length(3).capitalize(),
             'country': country
         }
         player = Player(**payload)

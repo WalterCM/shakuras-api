@@ -1,0 +1,9 @@
+{% extends 'admin/base.html' %}
+
+{% block title %}Players Generated{% endblock %}
+
+{% block content %}
+    <h1>Players Generated</h1>
+    <p>{{ number_of_players }} players have been successfully generated.</p>
+    <a href="{% url 'admin:core_player_changelist' %}">Go back to player list</a>
+{% endblock %}

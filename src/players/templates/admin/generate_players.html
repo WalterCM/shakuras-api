@@ -1,0 +1,12 @@
+{% extends 'admin/base.html' %}
+
+{% block title %}Generate Players{% endblock %}
+
+{% block content %}
+    <h1>Generate Players</h1>
+    <form method="post" action="{% url 'admin:generate_players' %}">
+        {% csrf_token %}
+        <input type="number" name="number_of_players" required>
+        <input type="submit" value="Generate">
+    </form>
+{% endblock %}
