@@ -1,13 +1,16 @@
-from django.urls import path
+from django.urls import path, include
 
-from rest_framework_simplejwt.views import TokenObtainPairView
-from rest_framework_simplejwt.views import TokenRefreshView
+from rest_framework.routers import DefaultRouter
 
 from . import views
 
-
 app_name = 'players'
 
+router = DefaultRouter()
+
+
+router.register('', views.PlayerViewSet)
+
 urlpatterns = [
-    path('list/', views.ManagePlayerView.as_view(), name='me')
+    path('', include(router.urls))
 ]

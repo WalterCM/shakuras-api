@@ -6,7 +6,7 @@ from core.models import Player
 
 class PlayerSerializer(serializers.ModelSerializer):
     """Serializer para el modelo Player"""
-    team = serializers.CharField(source='team.name')
+    team = serializers.CharField(source='team.name', allow_null=True)
 
     class Meta:
         model = Player

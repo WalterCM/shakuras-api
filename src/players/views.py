@@ -1,11 +1,14 @@
-from rest_framework import generics
-from rest_framework import permissions
+from rest_framework import mixins, status, viewsets, permissions
 
 from players import serializers
 from core.models import Player
 
 
-class ManagePlayerView(generics.ListAPIView):
+class PlayerViewSet(mixins.RetrieveModelMixin,
+                    mixins.UpdateModelMixin,
+                    mixins.ListModelMixin,
+                    viewsets.GenericViewSet):
     serializer_class = serializers.PlayerSerializer
     permission_classes = (permissions.IsAuthenticated,)
     queryset = Player.objects.all()
+    lookup_field = 'nickname'
