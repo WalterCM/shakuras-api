@@ -38,6 +38,15 @@ class User(AbstractUser):
 
     objects = UserManager()
 
+    @property
+    def name(self):
+        name = '{first_name} "{nickname}" {last_name}'
+        return name.format(
+            first_name=self.first_name,
+            nickname=self.nickname,
+            last_name=self.last_name
+        )
+
 
 class PlayerManager(models.Manager):
     def generate_player(self, nickname=None):
