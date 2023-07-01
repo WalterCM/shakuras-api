@@ -138,9 +138,9 @@ class Match(models.Model):
         FINISHED = 'finished'
 
         CHOICES = [
-            IDLE,
-            ONGOING,
-            FINISHED
+            (IDLE, 'IDLE'),
+            (ONGOING, 'ONGOING'),
+            (FINISHED, 'FINISHED')
         ]
 
     status = models.CharField(
@@ -159,7 +159,7 @@ class MatchParticipant(models.Model):
                 models.Q(app_label='core', model='Team')
         )
     )
-    object_id = models.CharField()
+    object_id = models.CharField(max_length=255)
     content_object = GenericForeignKey('content_type', 'object_id')
 
     match = models.ForeignKey(Match, on_delete=models.CASCADE, related_name='participants')
