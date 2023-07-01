@@ -1,4 +1,6 @@
 from django.db import models
+from django.contrib.contenttypes.models import ContentType
+from django.contrib.contenttypes.fields import GenericForeignKey
 
 from users.models import AbstractUser
 from users.models import UserManager as BaseUserManager
@@ -125,3 +127,44 @@ class Team(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class Match(models.Model):
+    date = models.DateTimeField()
+
+    class STATUS:
+        IDLE = 'idle'
+        ONGOING = 'ongoing'
+        FINISHED = 'finished'
+
+        CHOICES = [
+            IDLE,
+            ONGOING,
+            FINISHED
+        ]
+
+    status = models.CharField(
+        choices=STATUS.CHOICES,
+        max_length=10,
+        default=STATUS.IDLE
+    )
+
+
+class MatchParticipant(models.Model):
+    content_type = models.ForeignKey(
+        ContentType,
+        on_delete=models.CASCADE,
+        limit_choices_to=(
+                models.Q(app_label='core', model='Player') |
+                models.Q(app_label='core', model='Team')
+        )
+    )
+    object_id = models.CharField()
+    content_object = GenericForeignKey('content_type', 'object_id')
+
+    match = models.ForeignKey(Match, on_delete=models.CASCADE, related_name='participants')
+    score = models.CharField(max_length=4)
+
+
+class Tournament(models.Model):
+    pass
