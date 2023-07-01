@@ -74,21 +74,21 @@ class PlayerManager(models.Manager):
         fake.add_provider(CustomWordProvider)
 
         t = Transliterator()
-        name = fake.name()
 
         if locale == 'ko_KR':
-            name = t.romanize(name).split(' ')
+            name = t.romanize(fake.name()).split(' ')
             first_name = name[1]
             last_name = name[0]
         else:
-            name = name.split(' ')
-            first_name = name[0]
-            last_name = name[1]
+            first_name = fake.first_name()
+            last_name = fake.last_name()
+
+        nickname = nickname or fake.word_with_min_length(3).capitalize()
 
         payload = {
             'first_name': first_name,
             'last_name': last_name,
-            'nickname': nickname or fake.word_with_min_length(3).capitalize(),
+            'nickname': nickname,
             'country': country
         }
         player = Player(**payload)
@@ -99,7 +99,7 @@ class PlayerManager(models.Manager):
 class Player(models.Model):
     first_name = models.CharField(max_length=30)
     last_name = models.CharField(max_length=30)
-    nickname = models.CharField(max_length=20, unique=True)
+    nickname = models.CharField(max_length=20)
     country = models.CharField(max_length=30)
     team = models.ForeignKey('Team', related_name='players', on_delete=models.SET_NULL, null=True)
 
@@ -160,7 +160,7 @@ class MatchParticipant(models.Model):
         )
     )
     object_id = models.CharField(max_length=255)
-    content_object = GenericForeignKey('content_type', 'object_id')
+    participant = GenericForeignKey('content_type', 'object_id')
 
     match = models.ForeignKey(Match, on_delete=models.CASCADE, related_name='participants')
     score = models.CharField(max_length=4)
