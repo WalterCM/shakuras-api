@@ -1,9 +1,9 @@
 from django.contrib.auth import get_user_model
 
-from engine.users.serializers import UserSerializer as BaseUserSerializer
+from rest_framework import serializers
 
 
-class UserSerializer(BaseUserSerializer):
+class UserSerializer(serializers.ModelSerializer):
     """Serializer for user model"""
 
     class Meta:
@@ -13,6 +13,9 @@ class UserSerializer(BaseUserSerializer):
         )
         extra_kwargs = {
             'id': {'read_only': True},
-            'name': {'required': False},
             'password': {'write_only': True, 'min_length': 6}
         }
+
+    def create(self, validated_data):
+        """Creates a new user and returns it"""
+        return get_user_model().objects.create_user(**validated_data)
