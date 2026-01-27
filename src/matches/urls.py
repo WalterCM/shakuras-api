@@ -9,4 +9,5 @@ app_name = 'matches'
 
 urlpatterns = [
     path('', include(router.urls)),
+    path('<int:pk>/visualize/', views.ReplayView.as_view(), name='visualizer'),
 ]

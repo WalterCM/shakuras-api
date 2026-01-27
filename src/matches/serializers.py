@@ -25,8 +25,9 @@ class MatchParticipantSerializer(serializers.ModelSerializer):
 class MatchSerializer(serializers.ModelSerializer):
     """Serializer for match model"""
     participants = MatchParticipantSerializer(many=True, read_only=True)
+    replay_log = serializers.JSONField(source='replay.log', read_only=True)
 
     class Meta:
         model = Match
-        fields = ('id', 'date', 'status', 'participants')
+        fields = ('id', 'date', 'status', 'participants', 'replay_log')
         read_only_fields = ('id',)

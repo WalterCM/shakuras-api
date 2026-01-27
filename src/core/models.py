@@ -198,3 +198,13 @@ class MatchParticipant(models.Model):
 
 class Tournament(models.Model):
     pass
+
+
+class Replay(models.Model):
+    """Stores the full log of a match simulation for playback"""
+    match = models.OneToOneField(Match, on_delete=models.CASCADE, related_name='replay')
+    log = models.JSONField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Replay for Match {self.match.id}"

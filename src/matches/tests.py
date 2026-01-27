@@ -1,11 +1,11 @@
-from django.test import TestCase
+from django.test import TestCase, RequestFactory
 from django.urls import reverse
 from django.contrib.contenttypes.models import ContentType
 
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from core.models import Match, MatchParticipant, Player, Team
+from core.models import Match, MatchParticipant, Player, Team, Replay
 from matches.serializers import MatchSerializer
 
 MATCHES_URL = reverse('matches:match-list')
@@ -50,3 +50,35 @@ class PublicMatchApiTests(TestCase):
         self.assertEqual(res.data, serializer.data)
         self.assertEqual(len(res.data['participants']), 1)
         self.assertEqual(res.data['participants'][0]['participant']['nickname'], 'Flash')
+
+
+class ReplayViewTests(TestCase):
+    """Test the replay visualizer view"""
+
+    def setUp(self):
+        self.factory = RequestFactory()
+        self.match = Match.objects.create(
+            date='2026-01-27T12:00:00Z',
+            status=Match.STATUS.FINISHED
+        )
+        self.replay = Replay.objects.create(
+            match=self.match,
+            log=[{"tick": 0, "entities": []}]
+        )
+
+    def test_visualizer_view_success(self):
+        """Test that the visualizer view is accessible"""
+        url = reverse('matches:visualizer', args=[self.match.id])
+        request = self.factory.get(url)
+        
+        from matches.views import ReplayView
+        view = ReplayView.as_view()
+        res = view(request, pk=self.match.id)
+
+        self.assertEqual(res.status_code, 200)
+        # We can still check the context on the response if it's a TemplateResponse
+        self.assertEqual(res.context_data['match'], self.match)
+        # Render the response to check content
+        res.render()
+        self.assertIn(f'Match #{self.match.id}', res.content.decode())
+        self.assertIn('replay-canvas', res.content.decode())

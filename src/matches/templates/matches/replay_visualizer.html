@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Replay Visualizer - Match {{ match.id }}</title>
+    <style>
+        body {
+            background: #0f172a;
+            color: #f8fafc;
+            font-family: 'Inter', system-ui, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            background: #1e293b;
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            width: fit-content;
+        }
+
+        canvas {
+            background: #020617;
+            border-radius: 0.5rem;
+            border: 1px solid #334155;
+            cursor: crosshair;
+        }
+
+        .controls {
+            margin-top: 1rem;
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+            min-width: 80px;
+        }
+
+        button:hover {
+            background: #2563eb;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+            color: #94a3b8;
+        }
+
+        input[type=range] {
+            flex-grow: 1;
+            accent-color: #3b82f6;
+        }
+
+        select {
+            background: #334155;
+            color: white;
+            border: 1px solid #475569;
+            padding: 0.4rem;
+            border-radius: 0.375rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="stats">
+            <span>Match #{{ match.id }}</span>
+            <span id="tick-display">Tick: 0 / 0</span>
+        </div>
+        <canvas id="replay-canvas" width="600" height="600"></canvas>
+        <div class="controls">
+            <button id="play-pause">Play</button>
+            <input type="range" id="progress" min="0" max="0" value="0">
+            <select id="speed">
+                <option value="0.5">0.5x</option>
+                <option value="1" selected>1x</option>
+                <option value="2">2x</option>
+                <option value="5">5x</option>
+                <option value="10">10x</option>
+            </select>
+            <button id="reset">Reset</button>
+        </div>
+    </div>
+
+    {{ match.replay.log|json_script:"replay_data" }}
+
+    <script>
+        const canvas = document.getElementById('replay-canvas');
+        const ctx = canvas.getContext('2d');
+        const replayData = JSON.parse(document.getElementById('replay_data').textContent);
+
+        // Match State Constants
+        const SCALE = canvas.width / 100;
+
+        let currentTick = 0;
+        let isPlaying = false;
+        let playbackSpeed = 1;
+        let lastFrameTime = performance.now();
+
+        // Reconstructed state for current frame
+        let entitiesState = {};
+
+        const playPauseBtn = document.getElementById('play-pause');
+        const resetBtn = document.getElementById('reset');
+        const progressCtrl = document.getElementById('progress');
+        const speedCtrl = document.getElementById('speed');
+        const tickDisplay = document.getElementById('tick-display');
+
+        progressCtrl.max = replayData.length - 1;
+
+        // Initialize state from Tick 0 (Full Snapshot)
+        function initInitialState() {
+            entitiesState = {};
+            replayData[0].entities.forEach(ent => {
+                entitiesState[ent.id] = { ...ent };
+            });
+        }
+
+        function applyDelta(tickIndex) {
+            const tickData = replayData[tickIndex];
+            if (!tickData) return;
+
+            // Tick 0 is a full list, subsequent ticks are deltas
+            if (tickIndex === 0) {
+                initInitialState();
+            } else {
+                tickData.entities.forEach(delta => {
+                    if (entitiesState[delta.id]) {
+                        Object.assign(entitiesState[delta.id], delta);
+                    }
+                });
+            }
+        }
+
+        // To support scrubbing (progress slider), we must be able to jump to any tick
+        function jumpToTick(targetTick) {
+            if (targetTick < currentTick) {
+                // Moving backward: restart from 0
+                initInitialState();
+                for (let i = 0; i <= targetTick; i++) {
+                    applyDelta(i);
+                }
+            } else {
+                // Moving forward: apply deltas sequentially
+                for (let i = currentTick + 1; i <= targetTick; i++) {
+                    applyDelta(i);
+                }
+            }
+            currentTick = targetTick;
+            draw();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw grid
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= canvas.width; i += 60) {
+                ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); ctx.stroke();
+            }
+
+            tickDisplay.textContent = `Tick: ${currentTick} / ${replayData.length - 1}`;
+            progressCtrl.value = currentTick;
+
+            Object.values(entitiesState).forEach(entity => {
+                const x = entity.x * SCALE;
+                const y = entity.y * SCALE;
+
+                // Color based on owner_id (just use 2 players for now)
+                // We assume owner 1 vs others
+                const isP1 = entity.owner_id == replayData[0].entities[0].owner_id;
+                ctx.fillStyle = isP1 ? '#3b82f6' : '#ef4444';
+
+                ctx.beginPath();
+                if (entity.type === 'base') {
+                    ctx.roundRect(x - 15, y - 15, 30, 30, 5);
+                } else {
+                    ctx.arc(x, y, 6, 0, Math.PI * 2);
+                }
+                ctx.fill();
+
+                // HP Bar
+                const maxHp = entity.type === 'base' ? 1500 : 40;
+                const hpPercent = entity.hp / maxHp;
+                ctx.fillStyle = '#1e293b';
+                ctx.fillRect(x - 10, y - 22, 20, 4);
+                ctx.fillStyle = hpPercent > 0.5 ? '#10b981' : (hpPercent > 0.2 ? '#f59e0b' : '#ef4444');
+                ctx.fillRect(x - 10, y - 22, 20 * hpPercent, 4);
+            });
+        }
+
+        function animate(timestamp) {
+            if (isPlaying) {
+                const elapsed = timestamp - lastFrameTime;
+                const nextFrameDelay = 100 / playbackSpeed;
+
+                if (elapsed > nextFrameDelay) {
+                    if (currentTick < replayData.length - 1) {
+                        currentTick++;
+                        applyDelta(currentTick);
+                        draw();
+                    } else {
+                        isPlaying = false;
+                        playPauseBtn.textContent = 'Play';
+                    }
+                    lastFrameTime = timestamp;
+                }
+            }
+            requestAnimationFrame(animate);
+        }
+
+        playPauseBtn.onclick = () => {
+            isPlaying = !isPlaying;
+            playPauseBtn.textContent = isPlaying ? 'Pause' : 'Play';
+            if (isPlaying) {
+                if (currentTick >= replayData.length - 1) {
+                    currentTick = 0;
+                    initInitialState();
+                }
+                lastFrameTime = performance.now();
+            }
+        };
+
+        resetBtn.onclick = () => {
+            currentTick = 0;
+            isPlaying = false;
+            playPauseBtn.textContent = 'Play';
+            initInitialState();
+            draw();
+        };
+
+        progressCtrl.oninput = () => {
+            jumpToTick(parseInt(progressCtrl.value));
+        };
+
+        speedCtrl.onchange = () => {
+            playbackSpeed = parseFloat(speedCtrl.value);
+        };
+
+        // Start
+        initInitialState();
+        draw();
+        requestAnimationFrame(animate);
+    </script>
+</body>
+
+</html>
