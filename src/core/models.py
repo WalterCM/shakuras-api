@@ -85,11 +85,21 @@ class PlayerManager(models.Manager):
 
         nickname = nickname or fake.word_with_min_length(3).capitalize()
 
+        # Weighted race selection (Random is extremely rare)
+        race_choices = [Player.RACE.TERRAN, Player.RACE.ZERG, Player.RACE.PROTOSS, Player.RACE.RANDOM]
+        race_weights = [33, 33, 33, 1]
+        race = random.choices(race_choices, weights=race_weights)[0]
+
         payload = {
             'first_name': first_name,
             'last_name': last_name,
             'nickname': nickname,
-            'country': country
+            'country': country,
+            'race': race,
+            'macro': random.randint(10, 80),  # Baseline skills for recruits
+            'micro': random.randint(10, 80),
+            'multitasking': random.randint(10, 80),
+            'strategy': random.randint(10, 80),
         }
         player = Player(**payload)
 
@@ -97,11 +107,31 @@ class PlayerManager(models.Manager):
 
 
 class Player(models.Model):
+    class RACE:
+        TERRAN = 'terran'
+        ZERG = 'zerg'
+        PROTOSS = 'protoss'
+        RANDOM = 'random'
+
+        CHOICES = [
+            (TERRAN, 'Terran'),
+            (ZERG, 'Zerg'),
+            (PROTOSS, 'Protoss'),
+            (RANDOM, 'Random'),
+        ]
+
     first_name = models.CharField(max_length=30)
     last_name = models.CharField(max_length=30)
     nickname = models.CharField(max_length=20)
     country = models.CharField(max_length=30)
+    race = models.CharField(max_length=10, choices=RACE.CHOICES, default=RACE.RANDOM)
     team = models.ForeignKey('Team', related_name='players', on_delete=models.SET_NULL, null=True)
+
+    # Skills (0-100)
+    macro = models.IntegerField(default=0)
+    micro = models.IntegerField(default=0)
+    multitasking = models.IntegerField(default=0)
+    strategy = models.IntegerField(default=0)
 
     objects = PlayerManager()
 
