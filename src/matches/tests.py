@@ -4,7 +4,8 @@ from rest_framework import status
 from rest_framework.test import APIClient
 from core.models import Match, MatchParticipant, Player, Team, Replay
 from matches.serializers import MatchSerializer
-from matches.engine import Entity, MatchSimulator
+from matches.engine import Entity, MatchSimulator, SpatialGrid, Map
+from matches.utils import Vector2D
 import math
 from matches.data import UNIT_STATS
 
@@ -119,20 +120,23 @@ class EngineCoreTests(TestCase):
         
         # Speed is 1.8, so it should move towards (10,10)
         class MockGS:
-            def __init__(self): self.entities = {}
-        entity.update(MockGS())
+            def __init__(self):
+                self.entities = {}
+                self.grid = SpatialGrid(128, 128)
         
-        self.assertGreater(entity.pos_x, 0)
-        self.assertGreater(entity.pos_y, 0)
-        self.assertLess(entity.pos_x, 10)
+        mgs = MockGS()
+        entity.update(mgs)
+        
+        self.assertGreater(entity.pos.x, 0)
+        self.assertGreater(entity.pos.y, 0)
+        self.assertLess(entity.pos.x, 10)
         
         # Many ticks to reach destination
-        mgs = MockGS()
         for _ in range(20):
             entity.update(mgs)
             
-        self.assertEqual(entity.pos_x, 10)
-        self.assertEqual(entity.pos_y, 10)
+        self.assertEqual(entity.pos.x, 10)
+        self.assertEqual(entity.pos.y, 10)
         self.assertEqual(entity.status, 'idle')
 
     def test_entity_combat(self):
@@ -147,6 +151,7 @@ class EngineCoreTests(TestCase):
         class MockGameState:
             def __init__(self):
                 self.entities = {target.id: target}
+                self.grid = SpatialGrid(128, 128)
         
         game_state = MockGameState()
         attacker.status = 'attack'
@@ -174,6 +179,8 @@ class EngineCoreTests(TestCase):
         
         # Tick 0 should have full snapshots
         self.assertEqual(history[0]['tick'], 0)
+        self.assertIn('map', history[0])
+        self.assertEqual(history[0]['map']['width'], 128)
         self.assertIn('x', history[0]['entities'][0])
         self.assertIn('y', history[0]['entities'][0])
         self.assertIn('hp', history[0]['entities'][0])
@@ -201,6 +208,7 @@ class EngineCoreTests(TestCase):
             def __init__(self, resources):
                 self.entities = {patch.id: patch, worker.id: worker, base.id: base}
                 self.resources = resources
+                self.grid = SpatialGrid(128, 128)
             def add_minerals(self, pid, amount):
                 self.resources[pid] += amount
                 
@@ -293,11 +301,16 @@ class EngineCoreTests(TestCase):
         class MockGameState:
             def __init__(self):
                 self.entities = {u1.id: u1, u2.id: u2}
+                self.grid = SpatialGrid(128, 128)
         
         gs = MockGameState()
+        # Must populate grid manually for mock
+        gs.grid.insert(u1)
+        gs.grid.insert(u2)
+        
         u1.update(gs)
         u2.update(gs)
         
         # Distance should increase
-        dist_after = math.sqrt((u1.pos_x - u2.pos_x)**2 + (u1.pos_y - u2.pos_y)**2)
+        dist_after = u1.pos.dist_to(u2.pos)
         self.assertGreater(dist_after, 0.14) # initial dist ~0.1414

@@ -111,7 +111,9 @@
         const replayData = JSON.parse(document.getElementById('replay_data').textContent);
 
         // Match State Constants
-        const SCALE = canvas.width / 100;
+        const MAP_WIDTH = replayData[0].map?.width || 128;
+        const MAP_HEIGHT = replayData[0].map?.height || 128;
+        const SCALE = canvas.width / Math.max(MAP_WIDTH, MAP_HEIGHT);
 
         let currentTick = 0;
         let isPlaying = false;
@@ -214,6 +216,9 @@
                             ent.lastFlashTick = tickIndex;
                         }
                         Object.assign(ent, delta);
+                    } else {
+                        // NEW ENTITY spawned in this tick
+                        entitiesState[delta.id] = { ...delta };
                     }
                 });
             }
@@ -244,12 +249,14 @@
             // Draw grid
             ctx.strokeStyle = '#1e293b';
             ctx.lineWidth = 1 / camera.scale;
-            for (let i = 0; i <= 100; i += 10) {
+            for (let i = 0; i <= MAP_WIDTH; i += 8) {
                 ctx.beginPath();
-                ctx.moveTo(i * SCALE, 0); ctx.lineTo(i * SCALE, 100 * SCALE);
+                ctx.moveTo(i * SCALE, 0); ctx.lineTo(i * SCALE, MAP_HEIGHT * SCALE);
                 ctx.stroke();
+            }
+            for (let i = 0; i <= MAP_HEIGHT; i += 8) {
                 ctx.beginPath();
-                ctx.moveTo(0, i * SCALE); ctx.lineTo(100 * SCALE, i * SCALE);
+                ctx.moveTo(0, i * SCALE); ctx.lineTo(MAP_WIDTH * SCALE, i * SCALE);
                 ctx.stroke();
             }
 
