@@ -118,6 +118,16 @@
         let playbackSpeed = 1;
         let lastFrameTime = performance.now();
 
+        // Camera State
+        const camera = {
+            scale: 1,
+            offsetX: 0,
+            offsetY: 0,
+            isDragging: false,
+            lastX: 0,
+            lastY: 0
+        };
+
         // Reconstructed state for current frame
         let entitiesState = {};
 
@@ -132,6 +142,45 @@
         let playerResources = {};
 
         progressCtrl.max = replayData.length - 1;
+
+        // Zoom Logic
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const zoomSpeed = 0.1;
+            const delta = e.deltaY > 0 ? -zoomSpeed : zoomSpeed;
+            const nextScale = Math.min(Math.max(camera.scale + delta, 0.5), 10);
+
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            const worldX = (mouseX - camera.offsetX) / camera.scale;
+            const worldY = (mouseY - camera.offsetY) / camera.scale;
+
+            camera.scale = nextScale;
+            camera.offsetX = mouseX - worldX * camera.scale;
+            camera.offsetY = mouseY - worldY * camera.scale;
+
+            draw();
+        });
+
+        // Panning Logic
+        canvas.addEventListener('mousedown', (e) => {
+            camera.isDragging = true;
+            camera.lastX = e.clientX;
+            camera.lastY = e.clientY;
+        });
+        window.addEventListener('mouseup', () => camera.isDragging = false);
+        window.addEventListener('mousemove', (e) => {
+            if (!camera.isDragging) return;
+            const dx = e.clientX - camera.lastX;
+            const dy = e.clientY - camera.lastY;
+            camera.offsetX += dx;
+            camera.offsetY += dy;
+            camera.lastX = e.clientX;
+            camera.lastY = e.clientY;
+            draw();
+        });
 
         // Initialize state from Tick 0 (Full Snapshot)
         function initInitialState() {
@@ -155,14 +204,12 @@
             const tickData = replayData[tickIndex];
             if (!tickData) return;
 
-            // Tick 0 is a full list, subsequent ticks are deltas
             if (tickIndex === 0) {
                 initInitialState();
             } else {
                 tickData.entities.forEach(delta => {
                     const ent = entitiesState[delta.id];
                     if (ent) {
-                        // If HP changed and decreased, trigger a flash
                         if (delta.hp !== undefined && delta.hp < ent.hp) {
                             ent.lastFlashTick = tickIndex;
                         }
@@ -177,19 +224,12 @@
             }
         }
 
-        // To support scrubbing (progress slider), we must be able to jump to any tick
         function jumpToTick(targetTick) {
             if (targetTick < currentTick) {
-                // Moving backward: restart from 0
                 initInitialState();
-                for (let i = 0; i <= targetTick; i++) {
-                    applyDelta(i);
-                }
+                for (let i = 0; i <= targetTick; i++) applyDelta(i);
             } else {
-                // Moving forward: apply deltas sequentially
-                for (let i = currentTick + 1; i <= targetTick; i++) {
-                    applyDelta(i);
-                }
+                for (let i = currentTick + 1; i <= targetTick; i++) applyDelta(i);
             }
             currentTick = targetTick;
             draw();
@@ -198,12 +238,19 @@
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+            ctx.save();
+            ctx.setTransform(camera.scale, 0, 0, camera.scale, camera.offsetX, camera.offsetY);
+
             // Draw grid
             ctx.strokeStyle = '#1e293b';
-            ctx.lineWidth = 1;
-            for (let i = 0; i <= canvas.width; i += 60) {
-                ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
-                ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); ctx.stroke();
+            ctx.lineWidth = 1 / camera.scale;
+            for (let i = 0; i <= 100; i += 10) {
+                ctx.beginPath();
+                ctx.moveTo(i * SCALE, 0); ctx.lineTo(i * SCALE, 100 * SCALE);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(0, i * SCALE); ctx.lineTo(100 * SCALE, i * SCALE);
+                ctx.stroke();
             }
 
             tickDisplay.textContent = `Tick: ${currentTick} / ${replayData.length - 1}`;
@@ -214,62 +261,91 @@
 
                 const x = entity.x * SCALE;
                 const y = entity.y * SCALE;
-
-                // Flash white if recently damaged (within 3 ticks)
                 const isFlashing = entity.lastFlashTick && (currentTick - entity.lastFlashTick < 3);
 
-                // Color based on owner_id (just use 2 players for now)
-                if (entity.type === 'mineral_patch') {
-                    ctx.fillStyle = '#eab308'; // Gold
-                } else {
-                    const isP1 = entity.owner_id == replayData[0].entities[0].owner_id;
-                    ctx.fillStyle = isFlashing ? '#ffffff' : (isP1 ? '#3b82f6' : '#ef4444');
-                }
-
                 ctx.beginPath();
+                let radius = entity.radius ? entity.radius * SCALE : 6;
+
                 if (entity.type === 'base') {
                     ctx.roundRect(x - 15, y - 15, 30, 30, 5);
                 } else if (entity.type === 'mineral_patch') {
                     ctx.roundRect(x - 10, y - 10, 20, 20, 3);
                 } else {
-                    ctx.arc(x, y, 6, 0, Math.PI * 2);
+                    ctx.arc(x, y, radius, 0, Math.PI * 2);
                 }
+
+                let baseColor = entity.owner_id === 'p1' ? '#3b82f6' : '#ef4444';
+                if (entity.owner_id === 'neutral') baseColor = '#eab308';
+
+                if (entity.type === 'marine') {
+                    ctx.fillStyle = entity.owner_id === 'p1' ? '#00f2ff' : '#ff0055';
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 2 / camera.scale;
+                    ctx.shadowColor = ctx.fillStyle;
+                    ctx.shadowBlur = 10 * camera.scale;
+                } else if (entity.type === 'worker') {
+                    ctx.fillStyle = baseColor;
+                    ctx.strokeStyle = entity.carrying > 0 ? '#fbbf24' : 'rgba(0,0,0,0.2)';
+                    ctx.lineWidth = (entity.carrying > 0 ? 3 : 1) / camera.scale;
+                    ctx.shadowBlur = 0;
+                } else {
+                    ctx.fillStyle = baseColor;
+                    ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+                    ctx.lineWidth = 1 / camera.scale;
+                    ctx.shadowBlur = 0;
+                }
+
+                if (isFlashing) ctx.fillStyle = '#ffffff';
+
                 ctx.fill();
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+                ctx.closePath();
 
-                // Cargo Indicator (Gold Border for workers carrying minerals)
-                if (entity.carrying > 0) {
-                    ctx.strokeStyle = '#eab308';
-                    ctx.lineWidth = 2;
-                    ctx.stroke();
-                }
-
-                // HP Bar (Hide for full patches)
                 const maxHp = entity.type === 'base' ? 1500 : (entity.type === 'mineral_patch' ? 1500 : 40);
                 const hpPercent = entity.hp / maxHp;
 
                 if (hpPercent < 1.0 || entity.type !== 'mineral_patch') {
                     ctx.fillStyle = '#1e293b';
-                    ctx.fillRect(x - 10, y - 22, 20, 4);
-                    const barColor = entity.type === 'mineral_patch' ? '#eab308' :
-                        (hpPercent > 0.5 ? '#10b981' : (hpPercent > 0.2 ? '#f59e0b' : '#ef4444'));
+                    ctx.fillRect(x - 10, y - radius - 8, 20, 4);
+                    const barColor = hpPercent > 0.5 ? '#22c55e' : (hpPercent > 0.2 ? '#eab308' : '#ef4444');
                     ctx.fillStyle = barColor;
-                    ctx.fillRect(x - 10, y - 22, 20 * hpPercent, 4);
+                    ctx.fillRect(x - 10, y - radius - 8, 20 * hpPercent, 4);
                 }
 
-                // HP Text for Bases and Mineral Patches
-                if (entity.type === 'base' || (entity.type === 'mineral_patch' && hpPercent < 1.0)) {
-                    ctx.fillStyle = '#94a3b8';
-                    ctx.font = '10px Inter, sans-serif';
-                    ctx.fillText(`${Math.round(entity.hp)}`, x - 10, y + 25);
+                ctx.fillStyle = 'rgba(255,255,255,0.7)';
+                ctx.font = `${10 / camera.scale}px Inter`;
+                ctx.textAlign = 'center';
+
+                if (entity.type === 'base') {
+                    ctx.fillText(entity.hp.toFixed(0), x, y + 25);
+                    if (entity.prod_queue && entity.prod_queue.length > 0) {
+                        const unitName = entity.prod_queue[0].toUpperCase();
+                        const maxProd = unitName === 'MARINE' ? 24 : (unitName === 'WORKER' ? 20 : 120);
+                        ctx.fillStyle = '#1e293b';
+                        ctx.fillRect(x - 12, y + 28, 24, 4);
+                        ctx.fillStyle = '#3b82f6';
+                        ctx.fillRect(x - 12, y + 28, 24 * (entity.prod_progress / maxProd), 4);
+                        ctx.fillStyle = 'white';
+                        ctx.font = `bold ${9 / camera.scale}px Inter, sans-serif`;
+                        ctx.fillText(`${unitName} (${entity.prod_queue.length})`, x, y + 42);
+                    }
+                } else if (entity.type === 'mineral_patch') {
+                    ctx.fillText(entity.hp.toFixed(0), x, y + 20);
+                } else {
+                    // Small label for units
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = `bold ${8 / camera.scale}px Inter`;
+                    ctx.fillText(entity.type[0].toUpperCase(), x, y + 3);
                 }
             });
+            ctx.restore();
         }
 
         function animate(timestamp) {
             if (isPlaying) {
                 const elapsed = timestamp - lastFrameTime;
                 const nextFrameDelay = 100 / playbackSpeed;
-
                 if (elapsed > nextFrameDelay) {
                     if (currentTick < replayData.length - 1) {
                         currentTick++;
@@ -288,13 +364,11 @@
         playPauseBtn.onclick = () => {
             isPlaying = !isPlaying;
             playPauseBtn.textContent = isPlaying ? 'Pause' : 'Play';
-            if (isPlaying) {
-                if (currentTick >= replayData.length - 1) {
-                    currentTick = 0;
-                    initInitialState();
-                }
-                lastFrameTime = performance.now();
+            if (isPlaying && currentTick >= replayData.length - 1) {
+                currentTick = 0;
+                initInitialState();
             }
+            lastFrameTime = performance.now();
         };
 
         resetBtn.onclick = () => {
@@ -305,15 +379,9 @@
             draw();
         };
 
-        progressCtrl.oninput = () => {
-            jumpToTick(parseInt(progressCtrl.value));
-        };
+        progressCtrl.oninput = () => jumpToTick(parseInt(progressCtrl.value));
+        speedCtrl.onchange = () => playbackSpeed = parseFloat(speedCtrl.value);
 
-        speedCtrl.onchange = () => {
-            playbackSpeed = parseFloat(speedCtrl.value);
-        };
-
-        // Start
         initInitialState();
         draw();
         requestAnimationFrame(animate);

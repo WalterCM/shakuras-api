@@ -12,6 +12,7 @@ UNIT_STATS = {
         'speed': 0,
         'cost': 400,
         'build_time': 120,
+        'radius': 4.0,
     },
     'worker': {
         'hp': 40,
@@ -21,17 +22,19 @@ UNIT_STATS = {
         'speed': 1.8,
         'cost': 50,
         'build_time': 20,
-        'harvest_time': 30, # Ticks to mine (approx 1s)
+        'harvest_time': 30,
         'harvest_amount': 8,
+        'radius': 1.0,
     },
     'marine': {
         'hp': 40,
-        'damage': 6, # Reset to standard for realistic economy testing
+        'damage': 6,
         'range': 4,
         'cooldown': 15,
         'speed': 1.8,
         'cost': 50,
         'build_time': 24,
+        'radius': 1.0,
     },
     'zealot': {
         'hp': 160,
@@ -41,6 +44,7 @@ UNIT_STATS = {
         'speed': 1.8,
         'cost': 100,
         'build_time': 40,
+        'radius': 1.2,
     },
     'zergling': {
         'hp': 35,
@@ -50,9 +54,10 @@ UNIT_STATS = {
         'speed': 2.6,
         'cost': 25,
         'build_time': 28,
+        'radius': 0.8,
     },
     'mineral_patch': {
-        'hp': 1500, # This serves as the 'minerals remaining'
+        'hp': 1500,
         'max_hp': 1500,
         'damage': 0,
         'range': 0,
@@ -60,5 +65,6 @@ UNIT_STATS = {
         'speed': 0,
         'cost': 0,
         'build_time': 0,
+        'radius': 2.0,
     },
 }

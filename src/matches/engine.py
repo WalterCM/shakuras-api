@@ -17,6 +17,8 @@ class Entity:
         self.destination = None
         self.carrying = 0
         self.last_patch_id = None
+        self.production_queue = []
+        self.production_progress = 0
         
         # Load stats from data.py
         stats = UNIT_STATS.get(unit_type, UNIT_STATS['worker'])
@@ -28,6 +30,7 @@ class Entity:
         self.speed = stats['speed']
         self.harvest_time = stats.get('harvest_time', 0)
         self.harvest_amount = stats.get('harvest_amount', 0)
+        self.radius = stats.get('radius', 1.0)
         self.current_cooldown = 0
 
     def to_dict(self):
@@ -39,7 +42,10 @@ class Entity:
             'y': round(self.pos_y, 2),
             'hp': round(self.hp, 2),
             'status': self.status,
-            'carrying': self.carrying
+            'carrying': self.carrying,
+            'prod_queue': self.production_queue,
+            'prod_progress': self.production_progress,
+            'radius': self.radius
         }
 
     def take_damage(self, amount):
@@ -48,6 +54,7 @@ class Entity:
             self.hp = 0
             self.status = 'dead'
             self.carrying = 0 # Drop minerals on death
+            self.production_queue = [] # Cancel production
 
     def update(self, game_state):
         """Update entity state based on current logic"""
@@ -57,6 +64,7 @@ class Entity:
         if self.current_cooldown > 0:
             self.current_cooldown -= 1
 
+        # 1. Action-based Movement/Logic
         if self.status == 'move' and self.destination:
             self._handle_move()
         elif self.status == 'attack' and self.target_id:
@@ -65,8 +73,38 @@ class Entity:
             self._handle_harvest(game_state)
         elif self.status == 'return':
             self._handle_return(game_state)
-        elif self.status == 'idle':
-            pass
+        
+        if self.production_queue:
+            self._handle_production(game_state)
+            
+        # 3. Soft Collision (Repulsion)
+        # We only apply this to moving units or if they are overlapping
+        # Workers ignore collision while harvesting or returning (standard SC mechanic)
+        if self.type not in ['base', 'mineral_patch'] and self.status not in ['harvest', 'return']:
+            self._apply_repulsion(game_state)
+
+    def _apply_repulsion(self, game_state):
+        """Pushes away from other entities to prevent overlapping"""
+        for other in game_state.entities.values():
+            if other.id == self.id or other.status == 'dead':
+                continue
+                
+            dx = self.pos_x - other.pos_x
+            dy = self.pos_y - other.pos_y
+            dist_sq = dx**2 + dy**2
+            min_dist = self.radius + other.radius
+            
+            if dist_sq < min_dist**2 and dist_sq > 0.001:
+                dist = math.sqrt(dist_sq)
+                overlap = min_dist - dist
+                
+                # Push factor (softness)
+                # Buildings push units VERY strongly to keep them out of the floorplan
+                push_factor = 0.8 if other.type in ['base', 'mineral_patch'] else 0.2
+                
+                # Move slightly away
+                self.pos_x += (dx / dist) * overlap * push_factor
+                self.pos_y += (dy / dist) * overlap * push_factor
 
     def _handle_move(self):
         target_x, target_y = self.destination
@@ -157,6 +195,23 @@ class Entity:
             self.pos_x += (dx / dist) * move_dist
             self.pos_y += (dy / dist) * move_dist
 
+    def _handle_production(self, game_state):
+        unit_type = self.production_queue[0]
+        stats = UNIT_STATS.get(unit_type)
+        build_time = stats['build_time']
+        
+        self.production_progress += 1
+        
+        if self.production_progress >= build_time:
+            # Spawn unit just outside the building's radius (using an offset)
+            # For now, just spawn below (y+5), but we could make this a 'rally point'
+            new_unit = Entity(unit_type, self.owner_id, self.pos_x, self.pos_y + 5)
+            game_state._spawn_entity(new_unit)
+            
+            # Clean up queue
+            self.production_queue.pop(0)
+            self.production_progress = 0
+
 class MatchSimulator:
     """Handles the simulation loop of a match using JSON Deltas for efficiency"""
     def __init__(self, player1, player2, max_ticks=100):
@@ -174,21 +229,48 @@ class MatchSimulator:
         if player_id in self.resources:
             self.resources[player_id] += amount
 
+    def request_unit(self, player_id, unit_type):
+        """Attempts to queue a unit for production"""
+        stats = UNIT_STATS.get(unit_type)
+        if not stats or self.resources[player_id] < stats['cost']:
+            return False
+            
+        # Find an appropriate production building (just 'base' for now)
+        bases = [e for e in self.entities.values() 
+                 if e.owner_id == player_id and e.type == 'base' and e.status != 'dead']
+        
+        if not bases:
+            return False
+            
+        # Add to the base with the shortest queue
+        best_base = min(bases, key=lambda b: len(b.production_queue))
+        
+        if len(best_base.production_queue) < 5: # Max queue length
+            self.resources[player_id] -= stats['cost']
+            best_base.production_queue.append(unit_type)
+            return True
+            
+        return False
+
+    def _spawn_entity(self, entity):
+        self.entities[entity.id] = entity
+
     def _setup_initial_entities(self):
         # Bases
         self._add_entity(Entity('base', self.player1.id, 10, 10))
         self._add_entity(Entity('base', self.player2.id, 90, 90))
         
         # Mineral Patches near bases
-        self._add_entity(Entity('mineral_patch', 'neutral', 5, 20))
-        self._add_entity(Entity('mineral_patch', 'neutral', 20, 5))
-        self._add_entity(Entity('mineral_patch', 'neutral', 95, 80))
-        self._add_entity(Entity('mineral_patch', 'neutral', 80, 95))
+        # Adjusted positions to avoid overlapping with spawned units
+        self._add_entity(Entity('mineral_patch', 'neutral', 5, 25))
+        self._add_entity(Entity('mineral_patch', 'neutral', 25, 5))
+        self._add_entity(Entity('mineral_patch', 'neutral', 95, 75))
+        self._add_entity(Entity('mineral_patch', 'neutral', 75, 95))
         
         # Workers
         for i in range(4):
-            self._add_entity(Entity('worker', self.player1.id, 12 + i, 12))
-            self._add_entity(Entity('worker', self.player2.id, 88 - i, 88))
+            self._add_entity(Entity('worker', self.player1.id, 15 + i, 15))
+            self._add_entity(Entity('worker', self.player2.id, 85 - i, 85))
 
     def _add_entity(self, entity):
         self.entities[entity.id] = entity
@@ -218,24 +300,41 @@ class MatchSimulator:
         for tick in range(1, self.max_ticks):
             tick_deltas = []
             
-            # Snapshots
-            pre_update = {ent_id: (ent.pos_x, ent.pos_y, ent.hp, ent.status, ent.carrying) 
-                         for ent_id, ent in self.entities.items()}
+            # Simple Production AI
+            for pid in [self.player1.id, self.player2.id]:
+                if self.resources[pid] >= 100:
+                    # Alternating between workers and marines
+                    unit_type = 'marine' if random.random() > 0.3 else 'worker'
+                    self.request_unit(pid, unit_type)
+
+            # Snapshots (capture ALL entities including new ones)
+            pre_update = {}
+            for eid, ent in self.entities.items():
+                pre_update[eid] = (ent.pos_x, ent.pos_y, ent.hp, ent.status, ent.carrying, list(ent.production_queue), ent.production_progress)
+            
             old_resources = self.resources.copy()
+            old_entity_ids = set(self.entities.keys())
 
             # Update
             for ent in list(self.entities.values()):
                 ent.update(self)
 
-            # Record Entity Deltas
+            # Record Entity Deltas and New Entities
             for ent_id, ent in self.entities.items():
-                old_x, old_y, old_hp, old_status, old_carrying = pre_update[ent_id]
+                if ent_id not in old_entity_ids:
+                    # New Entity spawned this tick
+                    tick_deltas.append(ent.to_dict())
+                    continue
+
+                old_x, old_y, old_hp, old_status, old_carrying, old_q, old_prog = pre_update[ent_id]
                 
                 if (abs(ent.pos_x - old_x) > 0.01 or 
                     abs(ent.pos_y - old_y) > 0.01 or 
                     abs(ent.hp - old_hp) > 0.01 or 
                     ent.status != old_status or
-                    ent.carrying != old_carrying):
+                    ent.carrying != old_carrying or
+                    ent.production_queue != old_q or
+                    ent.production_progress != old_prog):
                     
                     delta = {'id': ent_id}
                     if abs(ent.pos_x - old_x) > 0.01: delta['x'] = round(ent.pos_x, 2)
@@ -243,13 +342,15 @@ class MatchSimulator:
                     if abs(ent.hp - old_hp) > 0.01: delta['hp'] = round(ent.hp, 2)
                     if ent.status != old_status: delta['status'] = ent.status
                     if ent.carrying != old_carrying: delta['carrying'] = ent.carrying
+                    if ent.production_queue != old_q: delta['prod_queue'] = ent.production_queue
+                    if ent.production_progress != old_prog: delta['prod_progress'] = ent.production_progress
                     
                     tick_deltas.append(delta)
             
             # Record Resource Deltas
             res_delta = {}
             for pid, amount in self.resources.items():
-                if abs(amount - old_resources[pid]) > 0.01:
+                if abs(amount - old_resources[pid]) > 0.1:
                     res_delta[pid] = round(amount, 1)
 
             if tick_deltas or res_delta:

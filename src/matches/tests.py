@@ -5,6 +5,7 @@ from rest_framework.test import APIClient
 from core.models import Match, MatchParticipant, Player, Team, Replay
 from matches.serializers import MatchSerializer
 from matches.engine import Entity, MatchSimulator
+import math
 from matches.data import UNIT_STATS
 
 MATCHES_URL = reverse('matches:match-list')
@@ -112,23 +113,26 @@ class EngineCoreTests(TestCase):
 
     def test_entity_movement(self):
         """Verify pos_x/y updates correctly in 'move' state"""
-        entity = Entity('marine', 'p1', 0, 0)
+        entity = Entity('worker', 'p1', 0, 0)
         entity.status = 'move'
-        entity.destination = (10, 0)
+        entity.destination = (10, 10)
         
-        # One update tick
-        entity.update(None)
+        # Speed is 1.8, so it should move towards (10,10)
+        class MockGS:
+            def __init__(self): self.entities = {}
+        entity.update(MockGS())
         
         self.assertGreater(entity.pos_x, 0)
-        self.assertEqual(entity.pos_y, 0)
+        self.assertGreater(entity.pos_y, 0)
         self.assertLess(entity.pos_x, 10)
         
         # Many ticks to reach destination
+        mgs = MockGS()
         for _ in range(20):
-            entity.update(None)
+            entity.update(mgs)
             
         self.assertEqual(entity.pos_x, 10)
-        self.assertEqual(entity.pos_y, 0)
+        self.assertEqual(entity.pos_y, 10)
         self.assertEqual(entity.status, 'idle')
 
     def test_entity_combat(self):
@@ -235,3 +239,65 @@ class EngineCoreTests(TestCase):
         worker.take_damage(40) # Death
         self.assertEqual(worker.status, 'dead')
         self.assertEqual(worker.carrying, 0)
+
+    def test_unit_production_spending(self):
+        """Verify minerals are deducted when queuing a unit"""
+        p1 = Player.objects.create(nickname='P1')
+        p2 = Player.objects.create(nickname='P2')
+        sim = MatchSimulator(p1, p2)
+        sim._setup_initial_entities()
+        
+        sim.resources[p1.id] = 100
+        success = sim.request_unit(p1.id, 'marine')
+        
+        self.assertTrue(success)
+        self.assertEqual(sim.resources[p1.id], 50) # Marine cost = 50
+        
+        # Check base queue
+        base = [e for e in sim.entities.values() if e.owner_id == p1.id and e.type == 'base'][0]
+        self.assertEqual(base.production_queue[0], 'marine')
+
+    def test_unit_production_timing(self):
+        """Verify unit spawns after build time ticks"""
+        p1 = Player.objects.create(nickname='P1')
+        p2 = Player.objects.create(nickname='P2')
+        sim = MatchSimulator(p1, p2)
+        sim._setup_initial_entities() # Tick 0
+        
+        sim.resources[p1.id] = 50
+        sim.request_unit(p1.id, 'marine') # Build time = 24
+        
+        initial_count = len(sim.entities)
+        
+        # Run for 23 ticks - unit should NOT be spawned yet
+        for _ in range(23):
+            for ent in list(sim.entities.values()):
+                ent.update(sim)
+        
+        self.assertEqual(len(sim.entities), initial_count)
+        
+        # Run 1 more tick - unit should spawn
+        for ent in list(sim.entities.values()):
+            ent.update(sim)
+            
+        self.assertEqual(len(sim.entities), initial_count + 1)
+        new_unit = list(sim.entities.values())[-1]
+        self.assertEqual(new_unit.type, 'marine')
+        self.assertEqual(new_unit.owner_id, p1.id)
+
+    def test_collision_repulsion(self):
+        """Verify that overlapping units push each other apart"""
+        u1 = Entity('worker', 'p1', 10, 10)
+        u2 = Entity('worker', 'p1', 10.1, 10.1) # Extreme overlap
+        
+        class MockGameState:
+            def __init__(self):
+                self.entities = {u1.id: u1, u2.id: u2}
+        
+        gs = MockGameState()
+        u1.update(gs)
+        u2.update(gs)
+        
+        # Distance should increase
+        dist_after = math.sqrt((u1.pos_x - u2.pos_x)**2 + (u1.pos_y - u2.pos_y)**2)
+        self.assertGreater(dist_after, 0.14) # initial dist ~0.1414
