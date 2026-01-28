@@ -183,3 +183,55 @@ class EngineCoreTests(TestCase):
                     # We shouldn't see 'type' or 'owner_id' in deltas usually unless they change (which they don't here)
                     self.assertNotIn('type', entity_delta)
                     self.assertNotIn('owner_id', entity_delta)
+
+    def test_harvest_income(self):
+        """Verify that a worker only deposits minerals at a base after mining"""
+        player1 = Player.objects.create(nickname='P1')
+        player2 = Player.objects.create(nickname='P2')
+        
+        worker = Entity('worker', player1.id, 0, 0)
+        patch = Entity('mineral_patch', 'neutral', 5, 0) # Close to worker
+        base = Entity('base', player1.id, 10, 0)
+        
+        class MockGameState:
+            def __init__(self, resources):
+                self.entities = {patch.id: patch, worker.id: worker, base.id: base}
+                self.resources = resources
+            def add_minerals(self, pid, amount):
+                self.resources[pid] += amount
+                
+        resources = {player1.id: 50.0}
+        gs = MockGameState(resources)
+        
+        worker.status = 'harvest'
+        worker.target_id = patch.id
+        
+        # 1. Harvest trip
+        worker.update(gs) # Move to patch or arrive
+        # If speed is high enough, it might arrive. Let's assume it mines.
+        while worker.status == 'harvest':
+            worker.update(gs)
+            
+        # Should now be carrying minerals and in 'return' state
+        self.assertEqual(worker.carrying, worker.harvest_amount)
+        self.assertEqual(worker.status, 'return')
+        self.assertEqual(resources[player1.id], 50.0) # Not deposited yet!
+
+        # 2. Return trip
+        while worker.status == 'return':
+            worker.update(gs)
+            
+        # Should have deposited
+        self.assertEqual(resources[player1.id], 50.0 + worker.harvest_amount)
+        self.assertEqual(worker.carrying, 0)
+        self.assertEqual(worker.status, 'harvest')
+
+    def test_interrupted_trip(self):
+        """Verify that killing a worker carrying minerals drops them"""
+        worker = Entity('worker', 'p1', 0, 0)
+        worker.carrying = 8
+        worker.status = 'return'
+        
+        worker.take_damage(40) # Death
+        self.assertEqual(worker.status, 'dead')
+        self.assertEqual(worker.carrying, 0)

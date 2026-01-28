@@ -82,6 +82,10 @@
     <div class="container">
         <div class="stats">
             <span>Match #{{ match.id }}</span>
+            <div id="resources" style="display: flex; gap: 1rem; font-weight: bold;">
+                <span id="p1-minerals" style="color: #3b82f6">M: 50</span>
+                <span id="p2-minerals" style="color: #ef4444">M: 50</span>
+            </div>
             <span id="tick-display">Tick: 0 / 0</span>
         </div>
         <canvas id="replay-canvas" width="600" height="600"></canvas>
@@ -122,6 +126,10 @@
         const progressCtrl = document.getElementById('progress');
         const speedCtrl = document.getElementById('speed');
         const tickDisplay = document.getElementById('tick-display');
+        const p1Minerals = document.getElementById('p1-minerals');
+        const p2Minerals = document.getElementById('p2-minerals');
+
+        let playerResources = {};
 
         progressCtrl.max = replayData.length - 1;
 
@@ -131,6 +139,16 @@
             replayData[0].entities.forEach(ent => {
                 entitiesState[ent.id] = { ...ent };
             });
+            playerResources = { ...replayData[0].resources };
+            updateResourceDisplay();
+        }
+
+        function updateResourceDisplay() {
+            const ids = Object.keys(playerResources);
+            if (ids.length >= 2) {
+                p1Minerals.textContent = `M: ${Math.round(playerResources[ids[0]])}`;
+                p2Minerals.textContent = `M: ${Math.round(playerResources[ids[1]])}`;
+            }
         }
 
         function applyDelta(tickIndex) {
@@ -151,6 +169,11 @@
                         Object.assign(ent, delta);
                     }
                 });
+            }
+
+            if (tickData.resources) {
+                Object.assign(playerResources, tickData.resources);
+                updateResourceDisplay();
             }
         }
 
@@ -196,28 +219,45 @@
                 const isFlashing = entity.lastFlashTick && (currentTick - entity.lastFlashTick < 3);
 
                 // Color based on owner_id (just use 2 players for now)
-                // We assume owner 1 vs others
-                const isP1 = entity.owner_id == replayData[0].entities[0].owner_id;
-                ctx.fillStyle = isFlashing ? '#ffffff' : (isP1 ? '#3b82f6' : '#ef4444');
+                if (entity.type === 'mineral_patch') {
+                    ctx.fillStyle = '#eab308'; // Gold
+                } else {
+                    const isP1 = entity.owner_id == replayData[0].entities[0].owner_id;
+                    ctx.fillStyle = isFlashing ? '#ffffff' : (isP1 ? '#3b82f6' : '#ef4444');
+                }
 
                 ctx.beginPath();
                 if (entity.type === 'base') {
                     ctx.roundRect(x - 15, y - 15, 30, 30, 5);
+                } else if (entity.type === 'mineral_patch') {
+                    ctx.roundRect(x - 10, y - 10, 20, 20, 3);
                 } else {
                     ctx.arc(x, y, 6, 0, Math.PI * 2);
                 }
                 ctx.fill();
 
-                // HP Bar
-                const maxHp = entity.type === 'base' ? 1500 : 40;
-                const hpPercent = entity.hp / maxHp;
-                ctx.fillStyle = '#1e293b';
-                ctx.fillRect(x - 10, y - 22, 20, 4);
-                ctx.fillStyle = hpPercent > 0.5 ? '#10b981' : (hpPercent > 0.2 ? '#f59e0b' : '#ef4444');
-                ctx.fillRect(x - 10, y - 22, 20 * hpPercent, 4);
+                // Cargo Indicator (Gold Border for workers carrying minerals)
+                if (entity.carrying > 0) {
+                    ctx.strokeStyle = '#eab308';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
 
-                // HP Text for Bases
-                if (entity.type === 'base') {
+                // HP Bar (Hide for full patches)
+                const maxHp = entity.type === 'base' ? 1500 : (entity.type === 'mineral_patch' ? 1500 : 40);
+                const hpPercent = entity.hp / maxHp;
+
+                if (hpPercent < 1.0 || entity.type !== 'mineral_patch') {
+                    ctx.fillStyle = '#1e293b';
+                    ctx.fillRect(x - 10, y - 22, 20, 4);
+                    const barColor = entity.type === 'mineral_patch' ? '#eab308' :
+                        (hpPercent > 0.5 ? '#10b981' : (hpPercent > 0.2 ? '#f59e0b' : '#ef4444'));
+                    ctx.fillStyle = barColor;
+                    ctx.fillRect(x - 10, y - 22, 20 * hpPercent, 4);
+                }
+
+                // HP Text for Bases and Mineral Patches
+                if (entity.type === 'base' || (entity.type === 'mineral_patch' && hpPercent < 1.0)) {
                     ctx.fillStyle = '#94a3b8';
                     ctx.font = '10px Inter, sans-serif';
                     ctx.fillText(`${Math.round(entity.hp)}`, x - 10, y + 25);
