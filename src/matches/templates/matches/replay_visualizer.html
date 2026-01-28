@@ -142,8 +142,13 @@
                 initInitialState();
             } else {
                 tickData.entities.forEach(delta => {
-                    if (entitiesState[delta.id]) {
-                        Object.assign(entitiesState[delta.id], delta);
+                    const ent = entitiesState[delta.id];
+                    if (ent) {
+                        // If HP changed and decreased, trigger a flash
+                        if (delta.hp !== undefined && delta.hp < ent.hp) {
+                            ent.lastFlashTick = tickIndex;
+                        }
+                        Object.assign(ent, delta);
                     }
                 });
             }
@@ -182,13 +187,18 @@
             progressCtrl.value = currentTick;
 
             Object.values(entitiesState).forEach(entity => {
+                if (entity.status === 'dead') return;
+
                 const x = entity.x * SCALE;
                 const y = entity.y * SCALE;
+
+                // Flash white if recently damaged (within 3 ticks)
+                const isFlashing = entity.lastFlashTick && (currentTick - entity.lastFlashTick < 3);
 
                 // Color based on owner_id (just use 2 players for now)
                 // We assume owner 1 vs others
                 const isP1 = entity.owner_id == replayData[0].entities[0].owner_id;
-                ctx.fillStyle = isP1 ? '#3b82f6' : '#ef4444';
+                ctx.fillStyle = isFlashing ? '#ffffff' : (isP1 ? '#3b82f6' : '#ef4444');
 
                 ctx.beginPath();
                 if (entity.type === 'base') {
@@ -205,6 +215,13 @@
                 ctx.fillRect(x - 10, y - 22, 20, 4);
                 ctx.fillStyle = hpPercent > 0.5 ? '#10b981' : (hpPercent > 0.2 ? '#f59e0b' : '#ef4444');
                 ctx.fillRect(x - 10, y - 22, 20 * hpPercent, 4);
+
+                // HP Text for Bases
+                if (entity.type === 'base') {
+                    ctx.fillStyle = '#94a3b8';
+                    ctx.font = '10px Inter, sans-serif';
+                    ctx.fillText(`${Math.round(entity.hp)}`, x - 10, y + 25);
+                }
             });
         }
 
