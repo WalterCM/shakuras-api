@@ -6,6 +6,7 @@ from core.models import Match, MatchParticipant, Player, Team, Replay
 from matches.serializers import MatchSerializer
 from matches.engine import Entity, MatchSimulator, SpatialGrid, Map
 from matches.utils import Vector2D
+from matches.actions import MoveAction, AttackAction, GatherAction
 import math
 from matches.data import UNIT_STATS
 
@@ -97,7 +98,7 @@ class EngineCoreTests(TestCase):
         self.assertEqual(entity.damage, stats['damage'])
         self.assertEqual(entity.range, stats['range'])
         self.assertEqual(entity.speed, stats['speed'])
-        self.assertEqual(entity.status, 'idle')
+        self.assertEqual(entity.get_current_status(), 'idle')
 
     def test_entity_take_damage(self):
         """Verify HP reduction and 'dead' status"""
@@ -106,17 +107,16 @@ class EngineCoreTests(TestCase):
         
         entity.take_damage(10)
         self.assertEqual(entity.hp, initial_hp - 10)
-        self.assertNotEqual(entity.status, 'dead')
+        self.assertNotEqual(entity.get_current_status(), 'dead')
         
         entity.take_damage(initial_hp)
         self.assertEqual(entity.hp, 0)
-        self.assertEqual(entity.status, 'dead')
+        self.assertEqual(entity.get_current_status(), 'dead')
 
     def test_entity_movement(self):
-        """Verify pos_x/y updates correctly in 'move' state"""
+        """Verify pos updates correctly in 'move' state"""
         entity = Entity('worker', 'p1', 0, 0)
-        entity.status = 'move'
-        entity.destination = (10, 10)
+        entity.action = MoveAction(Vector2D(10, 10))
         
         # Speed is 1.8, so it should move towards (10,10)
         class MockGS:
@@ -137,7 +137,7 @@ class EngineCoreTests(TestCase):
             
         self.assertEqual(entity.pos.x, 10)
         self.assertEqual(entity.pos.y, 10)
-        self.assertEqual(entity.status, 'idle')
+        self.assertEqual(entity.get_current_status(), 'idle')
 
     def test_entity_combat(self):
         """Verify target HP reduction and cooldown management"""
@@ -154,8 +154,7 @@ class EngineCoreTests(TestCase):
                 self.grid = SpatialGrid(128, 128)
         
         game_state = MockGameState()
-        attacker.status = 'attack'
-        attacker.target_id = target.id
+        attacker.action = AttackAction(target.id)
         
         initial_target_hp = target.hp
         
@@ -215,37 +214,36 @@ class EngineCoreTests(TestCase):
         resources = {'p1': 50.0}
         gs = MockGameState(resources)
         
-        worker.status = 'harvest'
-        worker.target_id = patch.id
+        worker.action = GatherAction(patch.id)
         
         # 1. Harvest trip
         worker.update(gs) # Move to patch or arrive
         # If speed is high enough, it might arrive. Let's assume it mines.
-        while worker.status == 'harvest':
+        while worker.get_current_status() == 'harvest':
             worker.update(gs)
             
         # Should now be carrying minerals and in 'return' state
         self.assertEqual(worker.carrying, worker.harvest_amount)
-        self.assertEqual(worker.status, 'return')
+        self.assertEqual(worker.get_current_status(), 'return')
         self.assertEqual(resources['p1'], 50.0) # Not deposited yet!
 
         # 2. Return trip
-        while worker.status == 'return':
+        while worker.get_current_status() == 'return':
             worker.update(gs)
             
         # Should have deposited
         self.assertEqual(resources['p1'], 50.0 + worker.harvest_amount)
         self.assertEqual(worker.carrying, 0)
-        self.assertEqual(worker.status, 'harvest')
+        self.assertEqual(worker.get_current_status(), 'harvest')
 
     def test_interrupted_trip(self):
         """Verify that killing a worker carrying minerals drops them"""
         worker = Entity('worker', 'p1', 0, 0)
         worker.carrying = 8
-        worker.status = 'return'
+        worker.get_current_status() # Initialize action if any
         
         worker.take_damage(40) # Death
-        self.assertEqual(worker.status, 'dead')
+        self.assertEqual(worker.get_current_status(), 'dead')
         self.assertEqual(worker.carrying, 0)
 
     def test_unit_production_spending(self):

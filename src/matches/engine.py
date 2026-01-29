@@ -4,6 +4,7 @@ import json
 import math
 from .data import UNIT_STATS
 from .utils import Vector2D
+from .actions import GatherAction, AttackAction, MoveAction, HoldAction
 
 class Map:
     """Stores static map data: dimensions, spawns, and terrain."""
@@ -60,8 +61,9 @@ class Entity:
         self.owner_id = owner_id
         self.pos = Vector2D(x, y)
         self.status = 'idle' # idle, move, attack, harvest, dead, return
-        self.target_id = None
-        self.destination = None
+        self.action = None  # Current action (GatherAction, AttackAction, etc.)
+        self.target_id = None  # Kept for backward compatibility
+        self.destination = None  # Kept for backward compatibility
         self.carrying = 0
         self.last_patch_id = None
         self.production_queue = []
@@ -80,6 +82,12 @@ class Entity:
         self.radius = stats.get('radius', 1.0)
         self.current_cooldown = 0
 
+    def get_current_status(self):
+        """Returns the status string from the current action or default"""
+        if self.action:
+            return self.action.get_status()
+        return self.status
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -88,7 +96,7 @@ class Entity:
             'x': round(self.pos.x, 2),
             'y': round(self.pos.y, 2),
             'hp': round(self.hp, 2),
-            'status': self.status,
+            'status': self.get_current_status(),
             'carrying': self.carrying,
             'prod_queue': self.production_queue,
             'prod_progress': self.production_progress,
@@ -100,6 +108,7 @@ class Entity:
         if self.hp <= 0:
             self.hp = 0
             self.status = 'dead'
+            self.action = None # Stop current behavior
             self.carrying = 0 # Drop minerals on death
             self.production_queue = [] # Cancel production
 
@@ -108,26 +117,23 @@ class Entity:
         if self.status == 'dead':
             return
 
+        # Tick down cooldown
         if self.current_cooldown > 0:
             self.current_cooldown -= 1
 
-        # 1. Action-based Movement/Logic
-        if self.status == 'move' and self.destination:
-            self._handle_move()
-        elif self.status == 'attack' and self.target_id:
-            self._handle_attack(game_state)
-        elif self.status == 'harvest' and self.target_id:
-            self._handle_harvest(game_state)
-        elif self.status == 'return':
-            self._handle_return(game_state)
+        # Execute current action
+        if self.action:
+            self.action.update(self, game_state)
         
         if self.production_queue:
             self._handle_production(game_state)
             
         # 3. Soft Collision (Repulsion)
         # We only apply this to moving units or if they are overlapping
-        # Workers ignore collision while harvesting or returning (standard SC mechanic)
-        if self.type not in ['base', 'mineral_patch'] and self.status not in ['harvest', 'return']:
+        # Workers ignore collision while mining (at the patch)
+        from .actions import GatherAction
+        is_mining = isinstance(self.action, GatherAction) and self.action.phase == 'mining'
+        if self.type not in ['base', 'mineral_patch'] and not is_mining:
             self._apply_repulsion(game_state)
 
     def _apply_repulsion(self, game_state):
@@ -164,85 +170,6 @@ class Entity:
                     self.pos.x += math.cos(angle) * push_dist
                     self.pos.y += math.sin(angle) * push_dist
 
-    def _handle_move(self):
-        target = Vector2D(*self.destination)
-        diff = target - self.pos
-        dist = diff.length()
-
-        if dist < self.speed:
-            self.pos = target
-            self.status = 'idle'
-            self.destination = None
-        else:
-            self.pos += diff.normalize() * self.speed
-
-    def _handle_attack(self, game_state):
-        target = game_state.entities.get(self.target_id)
-        if not target or target.status == 'dead':
-            self.status = 'idle'
-            self.target_id = None
-            return
-
-        diff = target.pos - self.pos
-        dist = diff.length()
-
-        if dist <= self.range:
-            if self.current_cooldown <= 0:
-                target.take_damage(self.damage)
-                self.current_cooldown = self.cooldown
-        else:
-            # Move towards target
-            move_dist = min(self.speed, dist - self.range + 0.1)
-            self.pos += diff.normalize() * move_dist
-
-    def _handle_harvest(self, game_state):
-        patch = game_state.entities.get(self.target_id)
-        if not patch or patch.hp <= 0:
-            self.status = 'idle'
-            self.target_id = None
-            return
-
-        diff = patch.pos - self.pos
-        dist = diff.length()
-
-        if dist <= self.range:
-            if self.current_cooldown <= 0:
-                # Actual mining time
-                patch.hp -= self.harvest_amount
-                self.carrying = self.harvest_amount
-                self.last_patch_id = patch.id
-                self.status = 'return'
-                self.current_cooldown = self.harvest_time # Mining duration
-        else:
-            # Move towards patch
-            move_dist = min(self.speed, dist - self.range + 0.1)
-            self.pos += diff.normalize() * move_dist
-
-    def _handle_return(self, game_state):
-        # Move back to nearest base
-        bases = [e for e in game_state.entities.values() 
-                 if e.owner_id == self.owner_id and e.type == 'base']
-        if not bases:
-            self.status = 'idle'
-            return
-            
-        # Find closest base
-        closest_base = min(bases, key=lambda b: self.pos.dist_to_sq(b.pos))
-        
-        diff = closest_base.pos - self.pos
-        dist = diff.length()
-        
-        if dist <= self.range:
-            if self.current_cooldown <= 0:
-                # Deposit minerals
-                game_state.add_minerals(self.owner_id, self.carrying)
-                self.carrying = 0
-                self.status = 'harvest'
-                self.target_id = self.last_patch_id
-        else:
-            # Move towards base
-            move_dist = min(self.speed, dist - self.range + 0.1)
-            self.pos += diff.normalize() * move_dist
 
     def _handle_production(self, game_state):
         unit_type = self.production_queue[0]
@@ -308,6 +235,24 @@ class MatchSimulator:
 
     def _spawn_entity(self, entity):
         self.entities[entity.id] = entity
+        
+        # Assign default actions to newly spawned units
+        if entity.type == 'worker':
+            # Workers harvest from nearest patch
+            patches = [e for e in self.entities.values() 
+                      if e.type == 'mineral_patch' and e.hp > 0]
+            if patches:
+                closest = min(patches, key=lambda p: entity.pos.dist_to_sq(p.pos))
+                entity.action = GatherAction(closest.id)
+        
+        elif entity.type in ['marine', 'zealot', 'zergling']:
+            # Combat units attack nearest enemy
+            enemies = [e for e in self.entities.values()
+                      if e.owner_id != entity.owner_id and e.owner_id != 'neutral'
+                      and e.status != 'dead' and e.type != 'mineral_patch']
+            if enemies:
+                closest = min(enemies, key=lambda e: entity.pos.dist_to_sq(e.pos))
+                entity.action = AttackAction(closest.id)
 
     def _setup_initial_entities(self):
         # Bases at fixed spawn points
@@ -336,15 +281,14 @@ class MatchSimulator:
         """Runs the simulation and returns delta-based JSON history"""
         self._setup_initial_entities()
         
-        # Assign workers to harvest
+        # Assign workers to harvest using GatherAction
         patches = [e for e in self.entities.values() if e.type == 'mineral_patch']
         
         for ent in self.entities.values():
             if ent.type == 'worker':
                 # Find closest patch
                 closest = min(patches, key=lambda p: ent.pos.dist_to_sq(p.pos))
-                ent.status = 'harvest'
-                ent.target_id = closest.id
+                ent.action = GatherAction(closest.id)
 
         # Initial State (Tick 0)
         initial_state = [e.to_dict() for e in self.entities.values()]
@@ -374,7 +318,15 @@ class MatchSimulator:
             # Snapshots (capture ALL entities including new ones)
             pre_update = {}
             for eid, ent in self.entities.items():
-                pre_update[eid] = (ent.pos.x, ent.pos.y, ent.hp, ent.status, ent.carrying, list(ent.production_queue), ent.production_progress)
+                pre_update[eid] = (
+                    ent.pos.x, 
+                    ent.pos.y, 
+                    ent.hp, 
+                    ent.get_current_status(), 
+                    ent.carrying, 
+                    list(ent.production_queue), 
+                    ent.production_progress
+                )
             
             old_resources = self.resources.copy()
             old_entity_ids = set(self.entities.keys())
@@ -395,16 +347,18 @@ class MatchSimulator:
                 if (abs(ent.pos.x - old_x) > 0.01 or 
                     abs(ent.pos.y - old_y) > 0.01 or 
                     abs(ent.hp - old_hp) > 0.01 or 
-                    ent.status != old_status or
+                    ent.get_current_status() != old_status or
                     ent.carrying != old_carrying or
                     ent.production_queue != old_q or
                     ent.production_progress != old_prog):
                     
                     delta = {'id': ent_id}
+                    curr_status = ent.get_current_status()
+
                     if abs(ent.pos.x - old_x) > 0.01: delta['x'] = round(ent.pos.x, 2)
                     if abs(ent.pos.y - old_y) > 0.01: delta['y'] = round(ent.pos.y, 2)
                     if abs(ent.hp - old_hp) > 0.01: delta['hp'] = round(ent.hp, 2)
-                    if ent.status != old_status: delta['status'] = ent.status
+                    if curr_status != old_status: delta['status'] = curr_status
                     if ent.carrying != old_carrying: delta['carrying'] = ent.carrying
                     if ent.production_queue != old_q: delta['prod_queue'] = ent.production_queue
                     if ent.production_progress != old_prog: delta['prod_progress'] = ent.production_progress

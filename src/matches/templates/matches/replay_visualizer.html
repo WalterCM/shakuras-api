@@ -22,6 +22,46 @@
             border-radius: 1rem;
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
             width: fit-content;
+            display: flex;
+            gap: 2rem;
+        }
+
+        .main-ui {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #delta-log {
+            width: 250px;
+            background: #020617;
+            border-radius: 0.5rem;
+            border: 1px solid #334155;
+            padding: 1rem;
+            font-family: 'JetBrains Mono', 'Courier New', monospace;
+            font-size: 0.75rem;
+            overflow-y: auto;
+            max-height: 600px;
+            color: #94a3b8;
+        }
+
+        .log-entry {
+            margin-bottom: 0.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #1e293b;
+        }
+
+        .log-tick {
+            color: #3b82f6;
+            font-weight: bold;
+        }
+
+        .log-status {
+            color: #fbbf24;
+        }
+
+        .log-val {
+            color: #f8fafc;
         }
 
         canvas {
@@ -80,26 +120,33 @@
 
 <body>
     <div class="container">
-        <div class="stats">
-            <span>Match #{{ match.id }}</span>
-            <div id="resources" style="display: flex; gap: 1rem; font-weight: bold;">
-                <span id="p1-minerals" style="color: #3b82f6">M: 50</span>
-                <span id="p2-minerals" style="color: #ef4444">M: 50</span>
+        <div class="main-ui">
+            <div class="stats">
+                <span>Match #{{ match.id }}</span>
+                <div id="resources" style="display: flex; gap: 1rem; font-weight: bold;">
+                    <span id="p1-minerals" style="color: #3b82f6">M: 50</span>
+                    <span id="p2-minerals" style="color: #ef4444">M: 50</span>
+                </div>
+                <span id="tick-display">Tick: 0 / 0</span>
             </div>
-            <span id="tick-display">Tick: 0 / 0</span>
+            <canvas id="replay-canvas" width="600" height="600"></canvas>
+            <div class="controls">
+                <button id="play-pause">Play</button>
+                <input type="range" id="progress" min="0" max="0" value="0">
+                <select id="speed">
+                    <option value="0.5">0.5x</option>
+                    <option value="1" selected>1x</option>
+                    <option value="2">2x</option>
+                    <option value="5">5x</option>
+                    <option value="10">10x</option>
+                </select>
+                <button id="reset">Reset</button>
+            </div>
         </div>
-        <canvas id="replay-canvas" width="600" height="600"></canvas>
-        <div class="controls">
-            <button id="play-pause">Play</button>
-            <input type="range" id="progress" min="0" max="0" value="0">
-            <select id="speed">
-                <option value="0.5">0.5x</option>
-                <option value="1" selected>1x</option>
-                <option value="2">2x</option>
-                <option value="5">5x</option>
-                <option value="10">10x</option>
-            </select>
-            <button id="reset">Reset</button>
+        <div id="delta-log">
+            <div style="font-weight: bold; color: #f8fafc; margin-bottom: 1rem; border-bottom: 2px solid #3b82f6;">
+                WORKER LOG (P1)</div>
+            <div id="log-content"></div>
         </div>
     </div>
 
@@ -140,10 +187,14 @@
         const tickDisplay = document.getElementById('tick-display');
         const p1Minerals = document.getElementById('p1-minerals');
         const p2Minerals = document.getElementById('p2-minerals');
+        const logContent = document.getElementById('log-content');
 
         let playerResources = {};
+        let monitoredWorkerId = null;
+        let nextDeltaIndex = 0; // Index in replayData
+        const MAX_TICKS = (replayData && replayData.length > 0) ? replayData[replayData.length - 1].tick : 0;
 
-        progressCtrl.max = replayData.length - 1;
+        progressCtrl.max = MAX_TICKS;
 
         // Zoom Logic
         canvas.addEventListener('wheel', (e) => {
@@ -187,11 +238,29 @@
         // Initialize state from Tick 0 (Full Snapshot)
         function initInitialState() {
             entitiesState = {};
-            replayData[0].entities.forEach(ent => {
-                entitiesState[ent.id] = { ...ent };
-            });
-            playerResources = { ...replayData[0].resources };
+            monitoredWorkerId = null;
+            logContent.innerHTML = '';
+            nextDeltaIndex = 0;
+
+            if (replayData && replayData.length > 0) {
+                replayData[0].entities.forEach(ent => {
+                    entitiesState[ent.id] = { ...ent };
+                    if (!monitoredWorkerId && ent.type === 'worker' && ent.owner_id === 'p1') {
+                        monitoredWorkerId = ent.id;
+                        addLogEntry(0, `Monitoring Worker <span class="log-val">${ent.id}</span>`);
+                    }
+                });
+                playerResources = { ...replayData[0].resources };
+                nextDeltaIndex = 1;
+            }
             updateResourceDisplay();
+        }
+
+        function addLogEntry(tick, message) {
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span class="log-tick">[Tick ${tick}]</span> ${message}`;
+            logContent.prepend(entry);
         }
 
         function updateResourceDisplay() {
@@ -202,26 +271,32 @@
             }
         }
 
-        function applyDelta(tickIndex) {
-            const tickData = replayData[tickIndex];
+        function applyDelta(tickData) {
             if (!tickData) return;
+            const tickIndex = tickData.tick;
 
-            if (tickIndex === 0) {
-                initInitialState();
-            } else {
-                tickData.entities.forEach(delta => {
-                    const ent = entitiesState[delta.id];
-                    if (ent) {
-                        if (delta.hp !== undefined && delta.hp < ent.hp) {
-                            ent.lastFlashTick = tickIndex;
+            tickData.entities.forEach(delta => {
+                const ent = entitiesState[delta.id];
+                if (ent) {
+                    // Log changes for monitored worker
+                    if (delta.id === monitoredWorkerId) {
+                        if (delta.status !== undefined && delta.status !== ent.status) {
+                            addLogEntry(tickIndex, `status: <span class="log-status">${ent.status}</span> → <span class="log-status">${delta.status}</span>`);
                         }
-                        Object.assign(ent, delta);
-                    } else {
-                        // NEW ENTITY spawned in this tick
-                        entitiesState[delta.id] = { ...delta };
+                        if (delta.carrying !== undefined && delta.carrying !== ent.carrying) {
+                            addLogEntry(tickIndex, `carrying: <span class="log-val">${ent.carrying}</span> → <span class="log-val">${delta.carrying}</span>`);
+                        }
                     }
-                });
-            }
+
+                    if (delta.hp !== undefined && delta.hp < ent.hp) {
+                        ent.lastFlashTick = tickIndex;
+                    }
+                    Object.assign(ent, delta);
+                } else {
+                    // NEW ENTITY spawned in this tick
+                    entitiesState[delta.id] = { ...delta };
+                }
+            });
 
             if (tickData.resources) {
                 Object.assign(playerResources, tickData.resources);
@@ -230,13 +305,16 @@
         }
 
         function jumpToTick(targetTick) {
-            if (targetTick < currentTick) {
-                initInitialState();
-                for (let i = 0; i <= targetTick; i++) applyDelta(i);
-            } else {
-                for (let i = currentTick + 1; i <= targetTick; i++) applyDelta(i);
+            initInitialState();
+            nextDeltaIndex = 0;
+            currentTick = 0;
+
+            while (nextDeltaIndex < replayData.length && replayData[nextDeltaIndex].tick <= targetTick) {
+                currentTick = replayData[nextDeltaIndex].tick;
+                applyDelta(replayData[nextDeltaIndex]);
+                nextDeltaIndex++;
             }
-            currentTick = targetTick;
+            currentTick = targetTick; // Catch up to the exact requested tick
             draw();
         }
 
@@ -260,7 +338,7 @@
                 ctx.stroke();
             }
 
-            tickDisplay.textContent = `Tick: ${currentTick} / ${replayData.length - 1}`;
+            tickDisplay.textContent = `Tick: ${currentTick} / ${MAX_TICKS}`;
             progressCtrl.value = currentTick;
 
             Object.values(entitiesState).forEach(entity => {
@@ -354,9 +432,13 @@
                 const elapsed = timestamp - lastFrameTime;
                 const nextFrameDelay = 100 / playbackSpeed;
                 if (elapsed > nextFrameDelay) {
-                    if (currentTick < replayData.length - 1) {
+                    if (currentTick < MAX_TICKS) {
                         currentTick++;
-                        applyDelta(currentTick);
+                        // Apply all deltas that occurred up to/at this tick
+                        while (nextDeltaIndex < replayData.length && replayData[nextDeltaIndex].tick <= currentTick) {
+                            applyDelta(replayData[nextDeltaIndex]);
+                            nextDeltaIndex++;
+                        }
                         draw();
                     } else {
                         isPlaying = false;
@@ -371,9 +453,10 @@
         playPauseBtn.onclick = () => {
             isPlaying = !isPlaying;
             playPauseBtn.textContent = isPlaying ? 'Pause' : 'Play';
-            if (isPlaying && currentTick >= replayData.length - 1) {
+            if (isPlaying && currentTick >= MAX_TICKS) {
                 currentTick = 0;
                 initInitialState();
+                nextDeltaIndex = 1; // 0 already applied in init
             }
             lastFrameTime = performance.now();
         };
@@ -383,6 +466,7 @@
             isPlaying = false;
             playPauseBtn.textContent = 'Play';
             initInitialState();
+            nextDeltaIndex = 1;
             draw();
         };
 
