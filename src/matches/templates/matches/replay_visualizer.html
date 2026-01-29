@@ -144,9 +144,12 @@
             </div>
         </div>
         <div id="delta-log">
-            <div style="font-weight: bold; color: #f8fafc; margin-bottom: 1rem; border-bottom: 2px solid #3b82f6;">
-                WORKER LOG (P1)</div>
-            <div id="log-content"></div>
+            <div id="log-header"
+                style="font-weight: bold; color: #f8fafc; margin-bottom: 1rem; border-bottom: 2px solid #3b82f6;">
+                SELECT ENTITY</div>
+            <div id="log-content">
+                <div style="color: #64748b; font-style: italic;">Click a unit or building to view its logs.</div>
+            </div>
         </div>
     </div>
 
@@ -188,9 +191,10 @@
         const p1Minerals = document.getElementById('p1-minerals');
         const p2Minerals = document.getElementById('p2-minerals');
         const logContent = document.getElementById('log-content');
+        const logHeader = document.getElementById('log-header');
 
         let playerResources = {};
-        let monitoredWorkerId = null;
+        let monitoredEntityId = null;
         let nextDeltaIndex = 0; // Index in replayData
         const MAX_TICKS = (replayData && replayData.length > 0) ? replayData[replayData.length - 1].tick : 0;
 
@@ -217,13 +221,24 @@
             draw();
         });
 
-        // Panning Logic
+        // Panning Logic (Middle Mouse Button)
         canvas.addEventListener('mousedown', (e) => {
-            camera.isDragging = true;
-            camera.lastX = e.clientX;
-            camera.lastY = e.clientY;
+            if (e.button === 1) { // Middle click
+                e.preventDefault();
+                camera.isDragging = true;
+                camera.lastX = e.clientX;
+                camera.lastY = e.clientY;
+                canvas.style.cursor = 'grabbing';
+            }
         });
-        window.addEventListener('mouseup', () => camera.isDragging = false);
+
+        window.addEventListener('mouseup', (e) => {
+            if (e.button === 1) {
+                camera.isDragging = false;
+                canvas.style.cursor = 'crosshair';
+            }
+        });
+
         window.addEventListener('mousemove', (e) => {
             if (!camera.isDragging) return;
             const dx = e.clientX - camera.lastX;
@@ -235,20 +250,52 @@
             draw();
         });
 
+        // Selection Logic (Left Click)
+        canvas.addEventListener('click', (e) => {
+            if (e.button !== 0) return; // Only left click
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            // Map to world coordinates
+            const worldX = (mouseX - camera.offsetX) / (camera.scale * SCALE);
+            const worldY = (mouseY - camera.offsetY) / (camera.scale * SCALE);
+
+            // Hit detection
+            let closest = null;
+            let minDist = 10; // Selection tolerance (world units)
+
+            Object.values(entitiesState).forEach(ent => {
+                if (ent.status === 'dead') return;
+                const dist = Math.sqrt((ent.x - worldX) ** 2 + (ent.y - worldY) ** 2);
+                const radius = ent.radius || 1.0;
+
+                if (dist < radius + 1.0 && dist < minDist) {
+                    minDist = dist;
+                    closest = ent;
+                }
+            });
+
+            if (closest) {
+                monitoredEntityId = closest.id;
+                logHeader.innerHTML = `${closest.type.toUpperCase()} <span style="color: ${closest.owner_id === 'p1' ? '#3b82f6' : '#ef4444'}">${closest.owner_id.toUpperCase()}</span> [${closest.id.slice(0, 4)}]`;
+                logContent.innerHTML = '';
+                addLogEntry(currentTick, `Selected ${closest.type} (${closest.id.slice(0, 8)})`);
+                draw();
+            }
+        });
+
         // Initialize state from Tick 0 (Full Snapshot)
         function initInitialState() {
             entitiesState = {};
-            monitoredWorkerId = null;
-            logContent.innerHTML = '';
+            // Don't clear monitoredEntityId on refresh/play unless user explicitly changes it
+            // logContent.innerHTML = ''; // Keep logs unless it's a full reset
+
             nextDeltaIndex = 0;
 
             if (replayData && replayData.length > 0) {
                 replayData[0].entities.forEach(ent => {
                     entitiesState[ent.id] = { ...ent };
-                    if (!monitoredWorkerId && ent.type === 'worker' && ent.owner_id === 'p1') {
-                        monitoredWorkerId = ent.id;
-                        addLogEntry(0, `Monitoring Worker <span class="log-val">${ent.id}</span>`);
-                    }
                 });
                 playerResources = { ...replayData[0].resources };
                 nextDeltaIndex = 1;
@@ -278,13 +325,18 @@
             tickData.entities.forEach(delta => {
                 const ent = entitiesState[delta.id];
                 if (ent) {
-                    // Log changes for monitored worker
-                    if (delta.id === monitoredWorkerId) {
+                    // Log changes for monitored entity
+                    if (delta.id === monitoredEntityId) {
                         if (delta.status !== undefined && delta.status !== ent.status) {
                             addLogEntry(tickIndex, `status: <span class="log-status">${ent.status}</span> → <span class="log-status">${delta.status}</span>`);
                         }
                         if (delta.carrying !== undefined && delta.carrying !== ent.carrying) {
                             addLogEntry(tickIndex, `carrying: <span class="log-val">${ent.carrying}</span> → <span class="log-val">${delta.carrying}</span>`);
+                        }
+                        if (delta.hp !== undefined && delta.hp !== ent.hp) {
+                            const diff = delta.hp - ent.hp;
+                            const color = diff < 0 ? '#ef4444' : '#22c55e';
+                            addLogEntry(tickIndex, `hp: <span class="log-val">${ent.hp}</span> → <span class="log-val" style="color: ${color}">${delta.hp}</span>`);
                         }
                     }
 
@@ -384,6 +436,16 @@
 
                 ctx.fill();
                 ctx.stroke();
+
+                // Highlight Selected Entity
+                if (entity.id === monitoredEntityId) {
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 2 / camera.scale;
+                    ctx.setLineDash([5, 5]);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+
                 ctx.shadowBlur = 0;
                 ctx.closePath();
 
@@ -466,6 +528,9 @@
             isPlaying = false;
             playPauseBtn.textContent = 'Play';
             initInitialState();
+            monitoredEntityId = null;
+            logHeader.textContent = 'SELECT ENTITY';
+            logContent.innerHTML = '<div style="color: #64748b; font-style: italic;">Click a unit or building to view its logs.</div>';
             nextDeltaIndex = 1;
             draw();
         };
