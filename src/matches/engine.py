@@ -145,17 +145,24 @@ class Entity:
             dist_sq = diff.length_sq()
             min_dist = self.radius + other.radius
             
-            if dist_sq < min_dist**2 and dist_sq > 0.001:
-                dist = math.sqrt(dist_sq)
-                overlap = min_dist - dist
-                
+            if dist_sq < min_dist**2:
                 # Push factor (softness)
                 # Buildings push units VERY strongly to keep them out of the floorplan
                 push_factor = 0.8 if other.type in ['base', 'mineral_patch', 'building'] else 0.2
                 
-                # Move slightly away
-                push = diff.normalize() * (overlap * push_factor)
-                self.pos += push
+                if dist_sq > 0.001:
+                    # Normal repulsion - units are close but not perfectly stacked
+                    dist = math.sqrt(dist_sq)
+                    overlap = min_dist - dist
+                    push = diff.normalize() * (overlap * push_factor)
+                    self.pos += push
+                else:
+                    # Units are perfectly stacked (same position)
+                    # Push in deterministic direction based on entity IDs
+                    angle = (hash(self.id + other.id) % 360) * (math.pi / 180)
+                    push_dist = min_dist * push_factor
+                    self.pos.x += math.cos(angle) * push_dist
+                    self.pos.y += math.sin(angle) * push_dist
 
     def _handle_move(self):
         target = Vector2D(*self.destination)
