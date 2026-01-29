@@ -259,13 +259,16 @@ class MatchSimulator:
     def __init__(self, player1, player2, map_data=None, max_ticks=100):
         self.player1 = player1
         self.player2 = player2
+        # Use string IDs for consistency with visualizer
+        self.player1_id = 'p1'
+        self.player2_id = 'p2'
         self.map = map_data or Map()
         self.max_ticks = max_ticks
         self.entities = {} # Use dict for fast lookup by ID
         self.history = [] # Stores deltas
         self.resources = {
-            self.player1.id: 50.0,
-            self.player2.id: 50.0
+            self.player1_id: 50.0,
+            self.player2_id: 50.0
         }
         self.grid = SpatialGrid(self.map.width, self.map.height)
 
@@ -304,8 +307,8 @@ class MatchSimulator:
         p1_spawn = self.map.spawn_points.get('p1', Vector2D(10, 10))
         p2_spawn = self.map.spawn_points.get('p2', Vector2D(self.map.width-10, self.map.height-10))
         
-        self._add_entity(Entity('base', self.player1.id, p1_spawn.x, p1_spawn.y))
-        self._add_entity(Entity('base', self.player2.id, p2_spawn.x, p2_spawn.y))
+        self._add_entity(Entity('base', self.player1_id, p1_spawn.x, p1_spawn.y))
+        self._add_entity(Entity('base', self.player2_id, p2_spawn.x, p2_spawn.y))
         
         # Mineral Patches near bases (Relative to spawn)
         self._add_entity(Entity('mineral_patch', 'neutral', p1_spawn.x - 5, p1_spawn.y + 15))
@@ -316,8 +319,8 @@ class MatchSimulator:
         
         # Workers
         for i in range(4):
-            self._add_entity(Entity('worker', self.player1.id, p1_spawn.x + 5 + i, p1_spawn.y + 5))
-            self._add_entity(Entity('worker', self.player2.id, p2_spawn.x - 5 - i, p2_spawn.y - 5))
+            self._add_entity(Entity('worker', self.player1_id, p1_spawn.x + 5 + i, p1_spawn.y + 5))
+            self._add_entity(Entity('worker', self.player2_id, p2_spawn.x - 5 - i, p2_spawn.y - 5))
 
     def _add_entity(self, entity):
         self.entities[entity.id] = entity
@@ -349,7 +352,7 @@ class MatchSimulator:
             tick_deltas = []
             
             # Simple Production AI
-            for pid in [self.player1.id, self.player2.id]:
+            for pid in [self.player1_id, self.player2_id]:
                 if self.resources[pid] >= 100:
                     # Alternating between workers and marines
                     unit_type = 'marine' if random.random() > 0.3 else 'worker'

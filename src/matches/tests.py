@@ -200,9 +200,9 @@ class EngineCoreTests(TestCase):
         player1 = Player.objects.create(nickname='P1')
         player2 = Player.objects.create(nickname='P2')
         
-        worker = Entity('worker', player1.id, 0, 0)
+        worker = Entity('worker', 'p1', 0, 0)
         patch = Entity('mineral_patch', 'neutral', 5, 0) # Close to worker
-        base = Entity('base', player1.id, 10, 0)
+        base = Entity('base', 'p1', 10, 0)
         
         class MockGameState:
             def __init__(self, resources):
@@ -212,7 +212,7 @@ class EngineCoreTests(TestCase):
             def add_minerals(self, pid, amount):
                 self.resources[pid] += amount
                 
-        resources = {player1.id: 50.0}
+        resources = {'p1': 50.0}
         gs = MockGameState(resources)
         
         worker.status = 'harvest'
@@ -227,14 +227,14 @@ class EngineCoreTests(TestCase):
         # Should now be carrying minerals and in 'return' state
         self.assertEqual(worker.carrying, worker.harvest_amount)
         self.assertEqual(worker.status, 'return')
-        self.assertEqual(resources[player1.id], 50.0) # Not deposited yet!
+        self.assertEqual(resources['p1'], 50.0) # Not deposited yet!
 
         # 2. Return trip
         while worker.status == 'return':
             worker.update(gs)
             
         # Should have deposited
-        self.assertEqual(resources[player1.id], 50.0 + worker.harvest_amount)
+        self.assertEqual(resources['p1'], 50.0 + worker.harvest_amount)
         self.assertEqual(worker.carrying, 0)
         self.assertEqual(worker.status, 'harvest')
 
@@ -255,14 +255,14 @@ class EngineCoreTests(TestCase):
         sim = MatchSimulator(p1, p2)
         sim._setup_initial_entities()
         
-        sim.resources[p1.id] = 100
-        success = sim.request_unit(p1.id, 'marine')
+        sim.resources['p1'] = 100
+        success = sim.request_unit('p1', 'marine')
         
         self.assertTrue(success)
-        self.assertEqual(sim.resources[p1.id], 50) # Marine cost = 50
+        self.assertEqual(sim.resources['p1'], 50) # Marine cost = 50
         
         # Check base queue
-        base = [e for e in sim.entities.values() if e.owner_id == p1.id and e.type == 'base'][0]
+        base = [e for e in sim.entities.values() if e.owner_id == 'p1' and e.type == 'base'][0]
         self.assertEqual(base.production_queue[0], 'marine')
 
     def test_unit_production_timing(self):
@@ -272,8 +272,8 @@ class EngineCoreTests(TestCase):
         sim = MatchSimulator(p1, p2)
         sim._setup_initial_entities() # Tick 0
         
-        sim.resources[p1.id] = 50
-        sim.request_unit(p1.id, 'marine') # Build time = 24
+        sim.resources['p1'] = 50
+        sim.request_unit('p1', 'marine') # Build time = 24
         
         initial_count = len(sim.entities)
         
@@ -291,7 +291,7 @@ class EngineCoreTests(TestCase):
         self.assertEqual(len(sim.entities), initial_count + 1)
         new_unit = list(sim.entities.values())[-1]
         self.assertEqual(new_unit.type, 'marine')
-        self.assertEqual(new_unit.owner_id, p1.id)
+        self.assertEqual(new_unit.owner_id, 'p1')
 
     def test_collision_repulsion(self):
         """Verify that overlapping units push each other apart"""
