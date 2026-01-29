@@ -216,11 +216,18 @@ class EngineCoreTests(TestCase):
         
         worker.action = GatherAction(patch.id)
         
-        # 1. Harvest trip
-        worker.update(gs) # Move to patch or arrive
-        # If speed is high enough, it might arrive. Let's assume it mines.
-        while worker.get_current_status() == 'harvest':
+        # 1. Move to patch and mine
+        # Run until worker reaches patch and starts mining
+        for _ in range(10):
             worker.update(gs)
+            if worker.get_current_status() == 'mining':
+                break
+        
+        # Continue mining until worker picks up minerals (takes ~30 ticks)
+        for _ in range(35):
+            worker.update(gs)
+            if worker.carrying > 0:
+                break
             
         # Should now be carrying minerals and in 'return' state
         self.assertEqual(worker.carrying, worker.harvest_amount)

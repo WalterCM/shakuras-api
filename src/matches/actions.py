@@ -40,9 +40,19 @@ class GatherAction(Action):
         
         # Patch depleted or missing - find another
         if not patch or patch.hp <= 0:
-            self.target_patch_id = self._find_nearest_patch(entity, game_state)
+            self.target_patch_id = self._find_nearest_unoccupied_patch(entity, game_state)
             if not self.target_patch_id:
                 # No patches available
+                entity.action = None
+                return
+            patch = game_state.entities.get(self.target_patch_id)
+        
+        # Check if patch is occupied by another worker
+        if patch.occupied_by and patch.occupied_by != entity.id:
+            # Patch is occupied - find another
+            self.target_patch_id = self._find_nearest_unoccupied_patch(entity, game_state)
+            if not self.target_patch_id:
+                # No unoccupied patches - wait/idle
                 entity.action = None
                 return
             patch = game_state.entities.get(self.target_patch_id)
@@ -55,7 +65,8 @@ class GatherAction(Action):
         actual_dist = max(0, dist - entity.radius - patch.radius)
         
         if actual_dist <= entity.range:
-            # Arrived at patch - start mining
+            # Arrived at patch - claim it and start mining
+            patch.occupied_by = entity.id
             self.phase = 'mining'
             # Ensure at least 1 tick of mining to prevent instant pickup
             self.mining_cooldown = max(1, entity.harvest_time)
@@ -70,12 +81,14 @@ class GatherAction(Action):
             self.mining_cooldown -= 1
             return
         
-        # Mining complete - pick up minerals
+        # Mining complete - pick up minerals and release patch
         patch = game_state.entities.get(self.target_patch_id)
         if patch and patch.hp > 0:
             patch.hp -= entity.harvest_amount
             entity.carrying = entity.harvest_amount
             entity.last_patch_id = patch.id
+            # Release the patch for other workers
+            patch.occupied_by = None
         
         self.phase = 'returning'
     
@@ -113,6 +126,16 @@ class GatherAction(Action):
         """Find the nearest mineral patch with resources"""
         patches = [e for e in game_state.entities.values()
                   if e.type == 'mineral_patch' and e.hp > 0]
+        if not patches:
+            return None
+        nearest = min(patches, key=lambda p: entity.pos.dist_to_sq(p.pos))
+        return nearest.id
+    
+    def _find_nearest_unoccupied_patch(self, entity, game_state):
+        """Find the nearest unoccupied mineral patch with resources"""
+        patches = [e for e in game_state.entities.values()
+                  if e.type == 'mineral_patch' and e.hp > 0 
+                  and (e.occupied_by is None or e.occupied_by == entity.id)]
         if not patches:
             return None
         nearest = min(patches, key=lambda p: entity.pos.dist_to_sq(p.pos))

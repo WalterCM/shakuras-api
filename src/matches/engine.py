@@ -81,6 +81,9 @@ class Entity:
         self.harvest_amount = stats.get('harvest_amount', 0)
         self.radius = stats.get('radius', 1.0)
         self.current_cooldown = 0
+        
+        # Resource contention tracking
+        self.occupied_by = None  # For mineral patches: ID of worker currently mining
 
     def get_current_status(self):
         """Returns the status string from the current action or default"""
