@@ -5,8 +5,8 @@ from django.urls import reverse
 from rest_framework.test import APIClient
 from rest_framework import status
 
-from core.models import Player
-from core.tests import get_test_user
+from players.models import Player
+from shakuras.test_utils import get_test_user
 
 LIST_PLAYERS_URL = reverse('players:player-list')
 

@@ -2,7 +2,7 @@ from rest_framework import generics
 from rest_framework import permissions
 
 from teams import serializers
-from core.models import Team
+from teams.models import Team
 
 
 class ManageTeamView(generics.ListAPIView):

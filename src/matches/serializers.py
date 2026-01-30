@@ -1,5 +1,7 @@
 from rest_framework import serializers
-from core.models import Match, MatchParticipant, Player, Team
+from matches.models import Match, MatchParticipant
+from players.models import Player
+from teams.models import Team
 from players.serializers import PlayerSerializer
 from teams.serializers import TeamSerializer
 

@@ -2,7 +2,7 @@
 Tests for production mechanics and unit spawning.
 """
 from django.test import TestCase
-from core.models import Player
+from players.models import Player
 from matches.engine import MatchSimulator
 
 

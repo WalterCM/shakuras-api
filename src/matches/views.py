@@ -1,6 +1,6 @@
 from django.views.generic import DetailView
 from rest_framework import viewsets, permissions
-from core.models import Match
+from matches.models import Match
 from matches import serializers
 
 

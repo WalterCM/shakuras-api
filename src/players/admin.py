@@ -4,7 +4,7 @@ from django.utils.html import format_html
 from django.shortcuts import render, redirect
 from django.urls import path
 
-from core.models import Player
+from players.models import Player
 
 
 class PlayerAdmin(admin.ModelAdmin):
@@ -20,7 +20,7 @@ class PlayerAdmin(admin.ModelAdmin):
 
             self.message_user(request, f'Successfully generated {number_of_players} players.')
 
-            return redirect('admin:core_player_changelist')
+            return redirect('admin:players_player_changelist')
 
         extra_context = extra_context or {}
         extra_context['show_generate_players_input'] = True

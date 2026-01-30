@@ -1,44 +1,7 @@
-
 from django.db import models
-from django.contrib.auth.models import AbstractBaseUser
-from django.contrib.auth.models import BaseUserManager
-from django.contrib.auth.models import PermissionsMixin
-
+from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.utils.translation import gettext_lazy as _
-
-
-# User
-class UserManager(BaseUserManager):
-    def get_test_payload(self):
-        return {
-            'email': 'test@mail.com',
-            'password': '123456',
-            'first_name': 'Bob',
-            'last_name': 'Ross'
-        }
-
-    def create_user(self, email=None, password=None, **extra_fields):
-        """Creates and saves the users"""
-        if not email:
-            raise ValueError('Users must have an email address')
-        user = self.model(
-            email=self.normalize_email(email),
-            **extra_fields
-        )
-        user.set_password(password)
-        user.save(using=self.db)
-
-        return user
-
-    def create_superuser(self, email=None, password=None,  **extra_fields):
-        """Creates and saves the superuser"""
-        user = self.create_user(email, password, **extra_fields)
-        user.is_staff = True
-        user.is_superuser = True
-        user.save(using=self.db)
-
-        return user
-
+from .managers import UserManager
 
 class AbstractUser(AbstractBaseUser, PermissionsMixin):
     """Personalized User abstract model"""
@@ -58,3 +21,23 @@ class AbstractUser(AbstractBaseUser, PermissionsMixin):
 
     class Meta:
         abstract = True
+
+class User(AbstractUser):
+    nickname = models.CharField(max_length=30, unique=True)
+
+    objects = UserManager()
+
+    class Meta:
+        db_table = 'core_user'  # Keep the existing table name to avoid data migration issues initially
+
+    @property
+    def name(self):
+        name = '{first_name} "{nickname}" {last_name}'
+        return name.format(
+            first_name=self.first_name,
+            nickname=self.nickname,
+            last_name=self.last_name
+        )
+
+    def __str__(self):
+        return self.email

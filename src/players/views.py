@@ -1,7 +1,7 @@
 from rest_framework import mixins, status, viewsets, permissions
 
 from players import serializers
-from core.models import Player
+from players.models import Player
 
 
 class PlayerViewSet(mixins.RetrieveModelMixin,

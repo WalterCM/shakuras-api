@@ -2,7 +2,9 @@ from django.test import TestCase, RequestFactory
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
-from core.models import Match, MatchParticipant, Player, Team, Replay
+from matches.models import Match, MatchParticipant, Replay
+from players.models import Player
+from teams.models import Team
 from matches.serializers import MatchSerializer
 from matches.engine import Entity, MatchSimulator, SpatialGrid, Map
 from matches.utils import Vector2D
