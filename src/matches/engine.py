@@ -143,6 +143,9 @@ class Entity:
         """Pushes away from nearby entities to prevent overlapping"""
         nearby_ids = game_state.grid.get_nearby_ids(self.pos)
         
+        # Pre-calculate my radius to avoid repeated access if significant
+        my_radius = self.radius
+        
         for other_id in nearby_ids:
             if other_id == self.id:
                 continue
@@ -150,25 +153,29 @@ class Entity:
             if not other or other.status == 'dead':
                 continue
                 
+            # If both are buildings, they don't push each other
+            if self.type in ['base', 'mineral_patch'] and other.type in ['base', 'mineral_patch']:
+                continue
+
             diff = self.pos - other.pos
             dist_sq = diff.length_sq()
-            min_dist = self.radius + other.radius
+            min_dist = my_radius + other.radius
             
             if dist_sq < min_dist**2:
                 # Push factor (softness)
-                # Buildings push units VERY strongly to keep them out of the floorplan
+                # Buildings push units VERY strongly
                 push_factor = 0.8 if other.type in ['base', 'mineral_patch', 'building'] else 0.2
                 
                 if dist_sq > 0.001:
-                    # Normal repulsion - units are close but not perfectly stacked
                     dist = math.sqrt(dist_sq)
                     overlap = min_dist - dist
+                    # Directly adjust pos to save on Vector2D creation if needed, 
+                    # but normalize returns a new vector anyway.
                     push = diff.normalize() * (overlap * push_factor)
                     self.pos += push
                 else:
-                    # Units are perfectly stacked (same position)
-                    # Push in deterministic direction based on entity IDs
-                    angle = (hash(self.id + other.id) % 360) * (math.pi / 180)
+                    # Deterministic push for perfectly stacked units
+                    angle = (hash(self.id + other_id) % 360) * (math.pi / 180)
                     push_dist = min_dist * push_factor
                     self.pos.x += math.cos(angle) * push_dist
                     self.pos.y += math.sin(angle) * push_dist
@@ -182,14 +189,27 @@ class Entity:
         self.production_progress += 1
         
         if self.production_progress >= build_time:
-            # Spawn unit just outside the building's radius (using an offset)
-            # Offset is relative to the base center
-            new_unit = Entity(unit_type, self.owner_id, self.pos.x, self.pos.y + 5)
+            # Spawn unit just outside the building's radius
+            # We use a slight offset of 1.0 beyond the radius
+            spawn_dist = self.radius + stats.get('radius', 1.0) + 1.0
+            new_unit = Entity(unit_type, self.owner_id, self.pos.x, self.pos.y + spawn_dist)
             game_state._spawn_entity(new_unit)
             
             # Clean up queue
             self.production_queue.pop(0)
             self.production_progress = 0
+
+
+class ProductionAI:
+    """Manages simple automated production for a player"""
+    def __init__(self, player_id):
+        self.player_id = player_id
+
+    def update(self, simulator):
+        if simulator.resources[self.player_id] >= 100:
+            # Alternating between workers and marines
+            unit_type = 'marine' if random.random() > 0.3 else 'worker'
+            simulator.request_unit(self.player_id, unit_type)
 
 class MatchSimulator:
     """Handles the simulation loop of a match using JSON Deltas for efficiency"""
@@ -208,6 +228,10 @@ class MatchSimulator:
             self.player2_id: 50.0
         }
         self.grid = SpatialGrid(self.map.width, self.map.height)
+        self.ai_controllers = [
+            ProductionAI(self.player1_id),
+            ProductionAI(self.player2_id)
+        ]
 
     def add_minerals(self, player_id, amount):
         if player_id in self.resources:
@@ -262,20 +286,30 @@ class MatchSimulator:
         p1_spawn = self.map.spawn_points.get('p1', Vector2D(10, 10))
         p2_spawn = self.map.spawn_points.get('p2', Vector2D(self.map.width-10, self.map.height-10))
         
-        self._add_entity(Entity('base', self.player1_id, p1_spawn.x, p1_spawn.y))
-        self._add_entity(Entity('base', self.player2_id, p2_spawn.x, p2_spawn.y))
+        self._spawn_entity(Entity('base', self.player1_id, p1_spawn.x, p1_spawn.y))
+        self._spawn_entity(Entity('base', self.player2_id, p2_spawn.x, p2_spawn.y))
         
-        # Mineral Patches near bases (Relative to spawn)
-        self._add_entity(Entity('mineral_patch', 'neutral', p1_spawn.x - 5, p1_spawn.y + 15))
-        self._add_entity(Entity('mineral_patch', 'neutral', p1_spawn.x + 15, p1_spawn.y - 5))
-        
-        self._add_entity(Entity('mineral_patch', 'neutral', p2_spawn.x + 5, p2_spawn.y - 15))
-        self._add_entity(Entity('mineral_patch', 'neutral', p2_spawn.x - 15, p2_spawn.y + 5))
+        # Mineral Patches in a semi-circle around each base
+        # P1 minerals
+        p1_minerals = [
+            (-5, 15), (5, 15), (15, 15), (15, 5), (15, -5),
+            (0, 18), (10, 18), (18, 10)
+        ]
+        for dx, dy in p1_minerals:
+            self._spawn_entity(Entity('mineral_patch', 'neutral', p1_spawn.x + dx, p1_spawn.y + dy))
+
+        # P2 minerals (mirrored)
+        p2_minerals = [
+            (5, -15), (-5, -15), (-15, -15), (-15, -5), (-15, 5),
+            (0, -18), (-10, -18), (-18, -10)
+        ]
+        for dx, dy in p2_minerals:
+            self._spawn_entity(Entity('mineral_patch', 'neutral', p2_spawn.x + dx, p2_spawn.y + dy))
         
         # Workers
         for i in range(4):
-            self._add_entity(Entity('worker', self.player1_id, p1_spawn.x + 5 + i, p1_spawn.y + 5))
-            self._add_entity(Entity('worker', self.player2_id, p2_spawn.x - 5 - i, p2_spawn.y - 5))
+            self._spawn_entity(Entity('worker', self.player1_id, p1_spawn.x + 5 + i, p1_spawn.y + 5))
+            self._spawn_entity(Entity('worker', self.player2_id, p2_spawn.x - 5 - i, p2_spawn.y - 5))
 
     def _add_entity(self, entity):
         self.entities[entity.id] = entity
@@ -284,15 +318,6 @@ class MatchSimulator:
         """Runs the simulation and returns delta-based JSON history"""
         self._setup_initial_entities()
         
-        # Assign workers to harvest using GatherAction
-        patches = [e for e in self.entities.values() if e.type == 'mineral_patch']
-        
-        for ent in self.entities.values():
-            if ent.type == 'worker':
-                # Find closest patch
-                closest = min(patches, key=lambda p: ent.pos.dist_to_sq(p.pos))
-                ent.action = GatherAction(closest.id)
-
         # Initial State (Tick 0)
         initial_state = [e.to_dict() for e in self.entities.values()]
         self.history.append({
@@ -303,76 +328,57 @@ class MatchSimulator:
         })
 
         for tick in range(1, self.max_ticks):
-            tick_deltas = []
-            
-            # Simple Production AI
-            for pid in [self.player1_id, self.player2_id]:
-                if self.resources[pid] >= 100:
-                    # Alternating between workers and marines
-                    unit_type = 'marine' if random.random() > 0.3 else 'worker'
-                    self.request_unit(pid, unit_type)
+            # 1. Update Controllers
+            for ai in self.ai_controllers:
+                ai.update(self)
 
-            # Update Grid
+            # 2. Prepare Spatial Search
             self.grid.clear()
             for ent in self.entities.values():
                 if ent.status != 'dead':
                     self.grid.insert(ent)
 
-            # Snapshots (capture ALL entities including new ones)
-            pre_update = {}
-            for eid, ent in self.entities.items():
-                pre_update[eid] = (
-                    ent.pos.x, 
-                    ent.pos.y, 
-                    ent.hp, 
-                    ent.get_current_status(), 
-                    ent.carrying, 
-                    list(ent.production_queue), 
-                    ent.production_progress
-                )
-            
+            # 3. Capture Snapshots for delta calculation
+            pre_update_snapshots = {eid: ent.to_dict() for eid, ent in self.entities.items()}
             old_resources = self.resources.copy()
             old_entity_ids = set(self.entities.keys())
 
-            # Update
+            # 4. Physics/Behavior Update
             for ent in list(self.entities.values()):
                 ent.update(self)
 
-            # Record Entity Deltas and New Entities
+            # 5. Record Deltas
+            tick_deltas = []
             for ent_id, ent in self.entities.items():
                 if ent_id not in old_entity_ids:
-                    # New Entity spawned this tick
+                    # New entity spawned
                     tick_deltas.append(ent.to_dict())
-                    continue
-
-                old_x, old_y, old_hp, old_status, old_carrying, old_q, old_prog = pre_update[ent_id]
-                
-                if (abs(ent.pos.x - old_x) > 0.01 or 
-                    abs(ent.pos.y - old_y) > 0.01 or 
-                    abs(ent.hp - old_hp) > 0.01 or 
-                    ent.get_current_status() != old_status or
-                    ent.carrying != old_carrying or
-                    ent.production_queue != old_q or
-                    ent.production_progress != old_prog):
-                    
+                else:
+                    # Existing entity - calculate delta
+                    old_snapshot = pre_update_snapshots[ent_id]
+                    new_snapshot = ent.to_dict()
                     delta = {'id': ent_id}
-                    curr_status = ent.get_current_status()
-
-                    if abs(ent.pos.x - old_x) > 0.01: delta['x'] = round(ent.pos.x, 2)
-                    if abs(ent.pos.y - old_y) > 0.01: delta['y'] = round(ent.pos.y, 2)
-                    if abs(ent.hp - old_hp) > 0.01: delta['hp'] = round(ent.hp, 2)
-                    if curr_status != old_status: delta['status'] = curr_status
-                    if ent.carrying != old_carrying: delta['carrying'] = ent.carrying
-                    if ent.production_queue != old_q: delta['prod_queue'] = ent.production_queue
-                    if ent.production_progress != old_prog: delta['prod_progress'] = ent.production_progress
+                    changed = False
                     
-                    tick_deltas.append(delta)
+                    for key, val in new_snapshot.items():
+                        if key == 'id': continue
+                        old_val = old_snapshot.get(key)
+                        
+                        # Use tolerance for floats
+                        if isinstance(val, (int, float)) and isinstance(old_val, (int, float)):
+                            if abs(val - old_val) > 0.01:
+                                delta[key] = val
+                                changed = True
+                        elif val != old_val:
+                            delta[key] = val
+                            changed = True
+                    
+                    if changed:
+                        tick_deltas.append(delta)
             
             # Record Resource Deltas
-            res_delta = {}
-            for pid, amount in self.resources.items():
-                if abs(amount - old_resources[pid]) > 0.1:
-                    res_delta[pid] = round(amount, 1)
+            res_delta = {pid: round(amount, 1) for pid, amount in self.resources.items() 
+                         if abs(amount - old_resources[pid]) > 0.1}
 
             if tick_deltas or res_delta:
                 entry = {'tick': tick}
