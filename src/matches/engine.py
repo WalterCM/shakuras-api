@@ -213,13 +213,26 @@ class ProductionAI:
 
 class MatchSimulator:
     """Handles the simulation loop of a match using JSON Deltas for efficiency"""
-    def __init__(self, player1, player2, map_data=None, max_ticks=100):
+    def __init__(self, player1, player2, map_instance=None, max_ticks=100):
         self.player1 = player1
         self.player2 = player2
         # Use string IDs for consistency with visualizer
         self.player1_id = 'p1'
         self.player2_id = 'p2'
-        self.map = map_data or Map()
+        
+        # Load from Map instance or use defaults
+        if map_instance:
+            self.map_data = map_instance
+        else:
+            # Fallback for compatibility/tests
+            from .models import Map
+            self.map_data = Map(
+                width=128, 
+                height=128, 
+                spawn_points={'p1': {'x': 10, 'y': 10}, 'p2': {'x': 118, 'y': 118}},
+                minerals=[]
+            )
+
         self.max_ticks = max_ticks
         self.entities = {} # Use dict for fast lookup by ID
         self.history = [] # Stores deltas
@@ -227,7 +240,7 @@ class MatchSimulator:
             self.player1_id: 50.0,
             self.player2_id: 50.0
         }
-        self.grid = SpatialGrid(self.map.width, self.map.height)
+        self.grid = SpatialGrid(self.map_data.width, self.map_data.height)
         self.ai_controllers = [
             ProductionAI(self.player1_id),
             ProductionAI(self.player2_id)
@@ -282,34 +295,17 @@ class MatchSimulator:
                 entity.action = AttackAction(closest.id)
 
     def _setup_initial_entities(self):
-        # Bases at fixed spawn points
-        p1_spawn = self.map.spawn_points.get('p1', Vector2D(10, 10))
-        p2_spawn = self.map.spawn_points.get('p2', Vector2D(self.map.width-10, self.map.height-10))
+        # Spawns from Map data
+        spawns = self.map_data.spawn_points
+        for pid, pos in spawns.items():
+            self._spawn_entity(Entity('base', pid, pos['x'], pos['y']))
+            # Initial workers near base
+            for i in range(4):
+                self._spawn_entity(Entity('worker', pid, pos['x'] + 2 + i, pos['y'] + 2))
         
-        self._spawn_entity(Entity('base', self.player1_id, p1_spawn.x, p1_spawn.y))
-        self._spawn_entity(Entity('base', self.player2_id, p2_spawn.x, p2_spawn.y))
-        
-        # Mineral Patches in a semi-circle around each base
-        # P1 minerals
-        p1_minerals = [
-            (-5, 15), (5, 15), (15, 15), (15, 5), (15, -5),
-            (0, 18), (10, 18), (18, 10)
-        ]
-        for dx, dy in p1_minerals:
-            self._spawn_entity(Entity('mineral_patch', 'neutral', p1_spawn.x + dx, p1_spawn.y + dy))
-
-        # P2 minerals (mirrored)
-        p2_minerals = [
-            (5, -15), (-5, -15), (-15, -15), (-15, -5), (-15, 5),
-            (0, -18), (-10, -18), (-18, -10)
-        ]
-        for dx, dy in p2_minerals:
-            self._spawn_entity(Entity('mineral_patch', 'neutral', p2_spawn.x + dx, p2_spawn.y + dy))
-        
-        # Workers
-        for i in range(4):
-            self._spawn_entity(Entity('worker', self.player1_id, p1_spawn.x + 5 + i, p1_spawn.y + 5))
-            self._spawn_entity(Entity('worker', self.player2_id, p2_spawn.x - 5 - i, p2_spawn.y - 5))
+        # Minerals from Map data
+        for m in self.map_data.minerals:
+            self._spawn_entity(Entity('mineral_patch', 'neutral', m['x'], m['y']))
 
     def _add_entity(self, entity):
         self.entities[entity.id] = entity
@@ -322,7 +318,7 @@ class MatchSimulator:
         initial_state = [e.to_dict() for e in self.entities.values()]
         self.history.append({
             'tick': 0, 
-            'map': {'width': self.map.width, 'height': self.map.height},
+            'map': {'width': self.map_data.width, 'height': self.map_data.height},
             'entities': initial_state,
             'resources': self.resources.copy()
         })

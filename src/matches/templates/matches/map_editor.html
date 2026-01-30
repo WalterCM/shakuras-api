@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shakuras - Map Editor</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --bg-card: #1e293b;
+            --accent: #38bdf8;
+            --accent-glow: rgba(56, 189, 248, 0.4);
+            --text-main: #f8fafc;
+            --text-dim: #94a3b8;
+            --danger: #ef4444;
+            --success: #10b981;
+            --mineral: #34d399;
+            --p1-color: #f87171;
+            --p2-color: #60a5fa;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            margin: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 320px;
+            background: var(--bg-card);
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            box-shadow: 4px 0 20px rgba(0, 0, 0, 0.3);
+            z-index: 10;
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin: 0;
+            background: linear-gradient(135deg, #fff, var(--accent));
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        label {
+            font-size: 14px;
+            color: var(--text-dim);
+            font-weight: 400;
+        }
+
+        input[type="text"],
+        input[type="number"] {
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 10px 14px;
+            border-radius: 8px;
+            color: white;
+            font-family: inherit;
+        }
+
+        .tools {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .tool-btn {
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 12px;
+            border-radius: 10px;
+            color: var(--text-dim);
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+        }
+
+        .tool-btn:hover {
+            border-color: var(--accent);
+            color: white;
+            background: rgba(56, 189, 248, 0.1);
+        }
+
+        .tool-btn.active {
+            border-color: var(--accent);
+            background: var(--accent);
+            color: var(--bg-dark);
+            font-weight: 600;
+            box-shadow: 0 0 15px var(--accent-glow);
+        }
+
+        .tool-btn .icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+        }
+
+        .btn-spawn-p1 .icon {
+            background: var(--p1-color);
+        }
+
+        .btn-spawn-p2 .icon {
+            background: var(--p2-color);
+        }
+
+        .btn-mineral .icon {
+            background: var(--mineral);
+            border-radius: 50%;
+        }
+
+        .btn-delete .icon {
+            background: var(--danger);
+        }
+
+        .save-btn {
+            margin-top: auto;
+            background: var(--accent);
+            color: var(--bg-dark);
+            border: none;
+            padding: 16px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .save-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px var(--accent-glow);
+        }
+
+        /* Editor Area */
+        .editor-container {
+            flex: 1;
+            position: relative;
+            background: #0b111e;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: auto;
+            padding: 40px;
+        }
+
+        #map-canvas {
+            background: #0f172a;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+            image-rendering: pixelated;
+            cursor: crosshair;
+        }
+
+        .instructions {
+            position: absolute;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(8px);
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            color: var(--text-dim);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="sidebar">
+        <h1>Map Editor</h1>
+
+        <div class="control-group">
+            <label>Map Name</label>
+            <input type="text" id="map-name" value="New Arena">
+        </div>
+
+        <div class="control-group">
+            <label>Dimensions (Width x Height)</label>
+            <div style="display: flex; gap: 8px;">
+                <input type="number" id="map-width" value="128" min="32" max="512">
+                <input type="number" id="map-height" value="128" min="32" max="512">
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label>Zoom Level (<span id="zoom-val">4x</span>)</label>
+            <input type="range" id="zoom-slider" min="1" max="16" value="4" step="1">
+        </div>
+
+        <div class="control-group">
+            <label>Placement Tools</label>
+            <div class="tools">
+                <button class="tool-btn btn-spawn-p1 active" data-tool="spawn-p1">
+                    <div class="icon"></div>
+                    Spawn P1
+                </button>
+                <button class="tool-btn btn-spawn-p2" data-tool="spawn-p2">
+                    <div class="icon"></div>
+                    Spawn P2
+                </button>
+                <button class="tool-btn btn-mineral" data-tool="mineral">
+                    <div class="icon"></div>
+                    Mineral
+                </button>
+                <button class="tool-btn btn-delete" data-tool="delete">
+                    <div class="icon"></div>
+                    Delete
+                </button>
+            </div>
+        </div>
+
+        <div id="stats"
+            style="font-size: 13px; color: var(--text-dim); display: flex; flex-direction: column; gap: 4px;">
+            <div>Minerals: <span id="count-minerals" style="color: var(--mineral); font-weight: 600;">0</span></div>
+            <div>Spawns: <span id="count-spawns" style="color: var(--accent); font-weight: 600;">0/2</span></div>
+            <div style="margin-top: 4px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 4px;">
+                Cursor: <span id="cursor-pos">0, 0</span>
+            </div>
+        </div>
+
+        <button class="save-btn" id="save-btn">Save Map</button>
+    </div>
+
+    <div class="editor-container">
+        <canvas id="map-canvas" width="512" height="512"></canvas>
+        <div class="instructions">
+            Left Click: Place/Pick | Mouse Wheel: Zoom (soon)
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('map-canvas');
+        const ctx = canvas.getContext('2d');
+        const nameInput = document.getElementById('map-name');
+        const widthInput = document.getElementById('map-width');
+        const heightInput = document.getElementById('map-height');
+        const zoomSlider = document.getElementById('zoom-slider');
+        const zoomVal = document.getElementById('zoom-val');
+        const cursorInfo = document.getElementById('cursor-pos');
+        const saveBtn = document.getElementById('save-btn');
+        const toolBtns = document.querySelectorAll('.tool-btn');
+
+        let mapWidth = parseInt(widthInput.value);
+        let mapHeight = parseInt(heightInput.value);
+        let scale = 4; // Current visual multiplier
+
+        let currentTool = 'spawn-p1';
+        let spawnPoints = {};
+        let minerals = [];
+        let mousePos = { x: 0, y: 0 };
+
+        // UI Setup
+        toolBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                toolBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentTool = btn.dataset.tool;
+            });
+        });
+
+        const updateInputs = () => {
+            mapWidth = parseInt(widthInput.value);
+            mapHeight = parseInt(heightInput.value);
+            scale = parseInt(zoomSlider.value);
+            zoomVal.textContent = scale + "x";
+
+            canvas.width = mapWidth * scale;
+            canvas.height = mapHeight * scale;
+            draw();
+        };
+
+        widthInput.addEventListener('change', updateInputs);
+        heightInput.addEventListener('change', updateInputs);
+        zoomSlider.addEventListener('input', updateInputs);
+
+        // Interaction
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            mousePos.x = Math.floor((e.clientX - rect.left) / scale);
+            mousePos.y = Math.floor((e.clientY - rect.top) / scale);
+            cursorInfo.textContent = `${mousePos.x}, ${mousePos.y}`;
+            draw();
+        });
+
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = Math.floor((e.clientX - rect.left) / scale);
+            const y = Math.floor((e.clientY - rect.top) / scale);
+
+            if (currentTool === 'spawn-p1') {
+                spawnPoints['p1'] = { x, y };
+            } else if (currentTool === 'spawn-p2') {
+                spawnPoints['p2'] = { x, y };
+            } else if (currentTool === 'mineral') {
+                minerals.push({ x, y });
+            } else if (currentTool === 'delete') {
+                // Delete logic
+                minerals = minerals.filter(m => Math.hypot(m.x - x, m.y - y) > 5);
+                if (spawnPoints['p1'] && Math.hypot(spawnPoints['p1'].x - x, spawnPoints['p1'].y - y) < 5) delete spawnPoints['p1'];
+                if (spawnPoints['p2'] && Math.hypot(spawnPoints['p2'].x - x, spawnPoints['p2'].y - y) < 5) delete spawnPoints['p2'];
+            }
+            draw();
+            updateStats();
+        });
+
+        const updateStats = () => {
+            document.getElementById('count-minerals').textContent = minerals.length;
+            document.getElementById('count-spawns').textContent = Object.keys(spawnPoints).length + "/2";
+        };
+
+        const draw = () => {
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Minor Grid (Individual cells)
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            for (let x = 0; x <= mapWidth; x += 1) {
+                ctx.moveTo(x * scale, 0);
+                ctx.lineTo(x * scale, canvas.height);
+            }
+            for (let y = 0; y <= mapHeight; y += 1) {
+                ctx.moveTo(0, y * scale);
+                ctx.lineTo(canvas.width, y * scale);
+            }
+            ctx.stroke();
+
+            // Major Grid (8x8 cells)
+            ctx.strokeStyle = 'rgba(56, 189, 248, 0.15)';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            for (let x = 0; x <= mapWidth; x += 8) {
+                ctx.moveTo(x * scale, 0);
+                ctx.lineTo(x * scale, canvas.height);
+            }
+            for (let y = 0; y <= mapHeight; y += 8) {
+                ctx.moveTo(0, y * scale);
+                ctx.lineTo(canvas.width, y * scale);
+            }
+            ctx.stroke();
+
+            // Hover Highlight (8x8 cell)
+            const cellX = Math.floor(mousePos.x / 8) * 8;
+            const cellY = Math.floor(mousePos.y / 8) * 8;
+            ctx.strokeStyle = 'rgba(56, 189, 248, 0.6)';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(cellX * scale, cellY * scale, 8 * scale, 8 * scale);
+
+            // Unit subdivision highlight (current 1x1 cell)
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.fillRect(mousePos.x * scale, mousePos.y * scale, scale, scale);
+
+            // Minerals
+            minerals.forEach(m => {
+                ctx.fillStyle = '#34d399';
+                ctx.beginPath();
+                ctx.arc(m.x * scale + scale / 2, m.y * scale + scale / 2, 0.4 * scale, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // Spawns
+            if (spawnPoints['p1']) {
+                ctx.fillStyle = '#f87171';
+                ctx.fillRect(spawnPoints['p1'].x * scale, spawnPoints['p1'].y * scale, scale, scale);
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(spawnPoints['p1'].x * scale, spawnPoints['p1'].y * scale, scale, scale);
+            }
+            if (spawnPoints['p2']) {
+                ctx.fillStyle = '#60a5fa';
+                ctx.fillRect(spawnPoints['p2'].x * scale, spawnPoints['p2'].y * scale, scale, scale);
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(spawnPoints['p2'].x * scale, spawnPoints['p2'].y * scale, scale, scale);
+            }
+        };
+
+        saveBtn.addEventListener('click', async () => {
+            if (Object.keys(spawnPoints).length < 2) {
+                alert("Please place both Spawn P1 and Spawn P2.");
+                return;
+            }
+
+            const payload = {
+                name: nameInput.value,
+                width: mapWidth,
+                height: mapHeight,
+                spawn_points: spawnPoints,
+                minerals: minerals
+            };
+
+            saveBtn.disabled = true;
+            saveBtn.textContent = "Saving...";
+
+            try {
+                const response = await fetch('/matches/editor/save/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+                if (result.status === 'ok') {
+                    alert("Map saved successfully!");
+                } else {
+                    alert("Error: " + result.message);
+                }
+            } catch (err) {
+                alert("Failed to save map.");
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.textContent = "Save Map";
+            }
+        });
+
+        // Init
+        updateInputs();
+    </script>
+</body>
+
+</html>
