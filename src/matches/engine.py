@@ -80,6 +80,8 @@ class Entity:
         self.harvest_time = stats.get('harvest_time', 0)
         self.harvest_amount = stats.get('harvest_amount', 0)
         self.radius = stats.get('radius', 1.0)
+        self.width = stats.get('width', 1)
+        self.height = stats.get('height', 1)
         self.current_cooldown = 0
         
         # Resource contention tracking
@@ -103,7 +105,9 @@ class Entity:
             'carrying': self.carrying,
             'prod_queue': self.production_queue,
             'prod_progress': self.production_progress,
-            'radius': self.radius
+            'radius': self.radius,
+            'width': self.width,
+            'height': self.height
         }
 
     def take_damage(self, amount):
@@ -206,10 +210,9 @@ class ProductionAI:
         self.player_id = player_id
 
     def update(self, simulator):
-        if simulator.resources[self.player_id] >= 100:
-            # Alternating between workers and marines
-            unit_type = 'marine' if random.random() > 0.3 else 'worker'
-            simulator.request_unit(self.player_id, unit_type)
+        # We only want workers now
+        if simulator.resources[self.player_id] >= 50:
+            simulator.request_unit(self.player_id, 'worker')
 
 class MatchSimulator:
     """Handles the simulation loop of a match using JSON Deltas for efficiency"""
@@ -295,17 +298,30 @@ class MatchSimulator:
                 entity.action = AttackAction(closest.id)
 
     def _setup_initial_entities(self):
-        # Spawns from Map data
+        # 1. Minerals FIRST from Map data so workers can find them
+        for m in self.map_data.minerals:
+            patch = Entity('mineral_patch', 'neutral', m['x'], m['y'])
+            # Center it: (x, y) from editor is top-left
+            patch.pos.x += patch.width / 2.0
+            patch.pos.y += patch.height / 2.0
+            self._spawn_entity(patch)
+
+        # 2. Spawns (Bases)
         spawns = self.map_data.spawn_points
         for pid, pos in spawns.items():
-            self._spawn_entity(Entity('base', pid, pos['x'], pos['y']))
-            # Initial workers near base
+            base = Entity('base', pid, pos['x'], pos['y'])
+            # Center it: (x, y) from editor is top-left
+            base.pos.x += base.width / 2.0
+            base.pos.y += base.height / 2.0
+            self._spawn_entity(base)
+            
+            # 3. Initial workers near base (spawned AFTER minerals)
+            # Spawn them in a cluster around the base center
+            bx, by = base.pos.x, base.pos.y
+            offsets = [(2.5, 0), (-2.5, 0), (0, 2), (0, -2)] 
             for i in range(4):
-                self._spawn_entity(Entity('worker', pid, pos['x'] + 2 + i, pos['y'] + 2))
-        
-        # Minerals from Map data
-        for m in self.map_data.minerals:
-            self._spawn_entity(Entity('mineral_patch', 'neutral', m['x'], m['y']))
+                ox, oy = offsets[i]
+                self._spawn_entity(Entity('worker', pid, bx + ox, by + oy))
 
     def _add_entity(self, entity):
         self.entities[entity.id] = entity

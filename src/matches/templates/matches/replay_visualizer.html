@@ -371,10 +371,15 @@
         }
 
         function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#020617'; // Void background
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             ctx.save();
             ctx.setTransform(camera.scale, 0, 0, camera.scale, camera.offsetX, camera.offsetY);
+
+            // Playable Map Background
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(0, 0, MAP_WIDTH * SCALE, MAP_HEIGHT * SCALE);
 
             // Draw grid
             ctx.strokeStyle = '#1e293b';
@@ -401,12 +406,13 @@
                 const isFlashing = entity.lastFlashTick && (currentTick - entity.lastFlashTick < 3);
 
                 ctx.beginPath();
+                let width = (entity.width || 1) * SCALE;
+                let height = (entity.height || 1) * SCALE;
                 let radius = entity.radius ? entity.radius * SCALE : 6;
 
-                if (entity.type === 'base') {
-                    ctx.roundRect(x - 15, y - 15, 30, 30, 5);
-                } else if (entity.type === 'mineral_patch') {
-                    ctx.roundRect(x - 10, y - 10, 20, 20, 3);
+                if (entity.type === 'base' || entity.type === 'mineral_patch') {
+                    // (x, y) is the center, so we offset by half width/height
+                    ctx.roundRect(x - width / 2, y - height / 2, width, height, entity.type === 'base' ? 5 : 3);
                 } else {
                     ctx.arc(x, y, radius, 0, Math.PI * 2);
                 }

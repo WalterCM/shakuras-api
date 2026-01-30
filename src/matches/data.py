@@ -12,19 +12,21 @@ UNIT_STATS = {
         'speed': 0,
         'cost': 400,
         'build_time': 120,
-        'radius': 4.0,
+        'radius': 2.5,  # Approximates a 4x3 area
+        'width': 4,
+        'height': 3,
     },
     'worker': {
         'hp': 40,
         'damage': 5,
-        'range': 1.5,
+        'range': 0.1,  # Strict adjacency
         'cooldown': 15,
         'speed': 1.8,
         'cost': 50,
         'build_time': 20,
         'harvest_time': 30,
         'harvest_amount': 8,
-        'radius': 1.0,
+        'radius': 0.5,  # 1x1 size
     },
     'marine': {
         'hp': 40,
@@ -65,6 +67,8 @@ UNIT_STATS = {
         'speed': 0,
         'cost': 0,
         'build_time': 0,
-        'radius': 2.0,
+        'radius': 1.2,  # Approximates a 2x1 area
+        'width': 2,
+        'height': 1,
     },
 }

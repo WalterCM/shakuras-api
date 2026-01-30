@@ -69,7 +69,7 @@ class TestMapEditor:
         # Should have 2 bases, 8 workers (4 per base), 1 mineral patch = 11 entities
         assert len(tick0['entities']) == 11
         
-        # Check base positions
+        # Check base positions (now centered: 10+2, 10+1.5)
         bases = [e for e in tick0['entities'] if e['type'] == 'base']
-        assert any(b['x'] == 10 and b['y'] == 10 for b in bases)
-        assert any(b['x'] == 190 and b['y'] == 190 for b in bases)
+        assert any(b['x'] == 12 and b['y'] == 11.5 for b in bases)
+        assert any(b['x'] == 192 and b['y'] == 191.5 for b in bases)
