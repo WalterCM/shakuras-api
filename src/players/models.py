@@ -30,9 +30,6 @@ class Player(models.Model):
 
     objects = PlayerManager()
 
-    class Meta:
-        db_table = 'core_player'
-
     def __str__(self):
         return self.name
 

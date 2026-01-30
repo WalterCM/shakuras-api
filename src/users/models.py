@@ -27,8 +27,6 @@ class User(AbstractUser):
 
     objects = UserManager()
 
-    class Meta:
-        db_table = 'core_user'  # Keep the existing table name to avoid data migration issues initially
 
     @property
     def name(self):

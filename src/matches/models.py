@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericForeignKey
 
+
 class Match(models.Model):
     date = models.DateTimeField()
 
@@ -22,9 +23,6 @@ class Match(models.Model):
         default=STATUS.IDLE
     )
 
-    class Meta:
-        db_table = 'core_match'
-
 class MatchParticipant(models.Model):
     content_type = models.ForeignKey(
         ContentType,
@@ -40,12 +38,7 @@ class MatchParticipant(models.Model):
     match = models.ForeignKey(Match, on_delete=models.CASCADE, related_name='participants')
     score = models.CharField(max_length=4)
 
-    class Meta:
-        db_table = 'core_matchparticipant'
-
 class Tournament(models.Model):
-    class Meta:
-        db_table = 'core_tournament'
     pass
 
 class Replay(models.Model):
@@ -53,9 +46,6 @@ class Replay(models.Model):
     match = models.OneToOneField(Match, on_delete=models.CASCADE, related_name='replay')
     log = models.JSONField()
     created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        db_table = 'core_replay'
 
     def __str__(self):
         return f"Replay for Match {self.match.id}"
