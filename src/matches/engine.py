@@ -87,13 +87,17 @@ class Entity:
         # Resource contention tracking
         self.occupied_by = None  # For mineral patches: ID of worker currently mining
 
-    def get_current_status(self):
+    def get_current_status(self, game_state=None):
         """Returns the status string from the current action or default"""
         if self.action:
-            return self.action.get_status()
+            try:
+                # Some actions might not take game_state yet, but GatherAction does
+                return self.action.get_status(self, game_state)
+            except TypeError:
+                return self.action.get_status()
         return self.status
 
-    def to_dict(self):
+    def to_dict(self, game_state=None):
         return {
             'id': self.id,
             'type': self.type,
@@ -101,7 +105,7 @@ class Entity:
             'x': round(self.pos.x, 2),
             'y': round(self.pos.y, 2),
             'hp': round(self.hp, 2),
-            'status': self.get_current_status(),
+            'status': self.get_current_status(game_state),
             'carrying': self.carrying,
             'prod_queue': self.production_queue,
             'prod_progress': self.production_progress,
@@ -136,16 +140,15 @@ class Entity:
             self._handle_production(game_state)
             
         # 3. Soft Collision (Repulsion)
-        # We only apply this to moving units or if they are overlapping
-        # Workers ignore collision while mining (at the patch)
-        from .actions import GatherAction
-        is_mining = isinstance(self.action, GatherAction) and self.action.phase == 'mining'
-        if self.type not in ['base', 'mineral_patch'] and not is_mining:
+        if self.type not in ['base', 'mineral_patch']:
             self._apply_repulsion(game_state)
 
     def _apply_repulsion(self, game_state):
         """Pushes away from nearby entities to prevent overlapping"""
         nearby_ids = game_state.grid.get_nearby_ids(self.pos)
+        
+        from .actions import GatherAction
+        am_gathering = isinstance(self.action, GatherAction)
         
         # Pre-calculate my radius to avoid repeated access if significant
         my_radius = self.radius
@@ -156,6 +159,15 @@ class Entity:
             other = game_state.entities.get(other_id)
             if not other or other.status == 'dead':
                 continue
+            
+            # WORKER GHOSTING: 
+            # Workers assigned to minerals ignore collision with buildings 
+            # and other gathering workers to prevent gridlocks.
+            if am_gathering:
+                if other.type in ['base', 'mineral_patch']:
+                    continue
+                if other.type == 'worker' and isinstance(other.action, GatherAction):
+                    continue
                 
             # If both are buildings, they don't push each other
             if self.type in ['base', 'mineral_patch'] and other.type in ['base', 'mineral_patch']:
@@ -210,9 +222,19 @@ class ProductionAI:
         self.player_id = player_id
 
     def update(self, simulator):
-        # We only want workers now
+        # 1. Production
         if simulator.resources[self.player_id] >= 50:
             simulator.request_unit(self.player_id, 'worker')
+            
+        # 2. Maintenance: Re-assign idle workers
+        from .actions import GatherAction
+        for ent in simulator.entities.values():
+            if ent.owner_id == self.player_id and ent.type == 'worker' and ent.status != 'dead':
+                if ent.action is None:
+                    # Find a job
+                    patch_id = GatherAction(None)._find_best_patch(ent, simulator)
+                    if patch_id:
+                        ent.action = GatherAction(patch_id)
 
 class MatchSimulator:
     """Handles the simulation loop of a match using JSON Deltas for efficiency"""
@@ -280,13 +302,12 @@ class MatchSimulator:
         self.entities[entity.id] = entity
         
         # Assign default actions to newly spawned units
+        from .actions import GatherAction, AttackAction
         if entity.type == 'worker':
-            # Workers harvest from nearest patch
-            patches = [e for e in self.entities.values() 
-                      if e.type == 'mineral_patch' and e.hp > 0]
-            if patches:
-                closest = min(patches, key=lambda p: entity.pos.dist_to_sq(p.pos))
-                entity.action = GatherAction(closest.id)
+            # Use smart distribution (even for initial/produced workers)
+            patch_id = GatherAction(None)._find_best_patch(entity, self)
+            if patch_id:
+                entity.action = GatherAction(patch_id)
         
         elif entity.type in ['marine', 'zealot', 'zergling']:
             # Combat units attack nearest enemy
@@ -316,9 +337,9 @@ class MatchSimulator:
             self._spawn_entity(base)
             
             # 3. Initial workers near base (spawned AFTER minerals)
-            # Spawn them in a cluster around the base center
+            # Spawn them in a row below the base
             bx, by = base.pos.x, base.pos.y
-            offsets = [(2.5, 0), (-2.5, 0), (0, 2), (0, -2)] 
+            offsets = [(-1.5, 2.5), (-0.5, 2.5), (0.5, 2.5), (1.5, 2.5)] 
             for i in range(4):
                 ox, oy = offsets[i]
                 self._spawn_entity(Entity('worker', pid, bx + ox, by + oy))
@@ -331,7 +352,7 @@ class MatchSimulator:
         self._setup_initial_entities()
         
         # Initial State (Tick 0)
-        initial_state = [e.to_dict() for e in self.entities.values()]
+        initial_state = [e.to_dict(self) for e in self.entities.values()]
         self.history.append({
             'tick': 0, 
             'map': {'width': self.map_data.width, 'height': self.map_data.height},
@@ -343,7 +364,6 @@ class MatchSimulator:
             # 1. Update Controllers
             for ai in self.ai_controllers:
                 ai.update(self)
-
             # 2. Prepare Spatial Search
             self.grid.clear()
             for ent in self.entities.values():
@@ -351,7 +371,7 @@ class MatchSimulator:
                     self.grid.insert(ent)
 
             # 3. Capture Snapshots for delta calculation
-            pre_update_snapshots = {eid: ent.to_dict() for eid, ent in self.entities.items()}
+            pre_update_snapshots = {eid: ent.to_dict(self) for eid, ent in self.entities.items()}
             old_resources = self.resources.copy()
             old_entity_ids = set(self.entities.keys())
 
@@ -364,11 +384,11 @@ class MatchSimulator:
             for ent_id, ent in self.entities.items():
                 if ent_id not in old_entity_ids:
                     # New entity spawned
-                    tick_deltas.append(ent.to_dict())
+                    tick_deltas.append(ent.to_dict(self))
                 else:
                     # Existing entity - calculate delta
                     old_snapshot = pre_update_snapshots[ent_id]
-                    new_snapshot = ent.to_dict()
+                    new_snapshot = ent.to_dict(self)
                     delta = {'id': ent_id}
                     changed = False
                     

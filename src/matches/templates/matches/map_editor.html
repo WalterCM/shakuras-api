@@ -241,6 +241,19 @@
             </div>
         </div>
 
+        <div class="control-group">
+            <label>Reference Image (Tracing)</label>
+            <input type="file" id="ref-image-input" accept="image/*" style="font-size: 11px;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+                <label style="flex-shrink: 0; font-size: 12px;">Opacity</label>
+                <input type="range" id="ref-opacity-slider" min="0" max="1" step="0.05" value="0.3"
+                    style="width: 100%;">
+            </div>
+            <button id="clear-ref-btn"
+                style="background: rgba(239, 68, 68, 0.2); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.2); padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; margin-top: 4px; display: none;">Clear
+                Reference</button>
+        </div>
+
         <button class="save-btn" id="save-btn">Save Map</button>
     </div>
 
@@ -303,6 +316,41 @@
         heightInput.addEventListener('change', updateInputs);
         zoomSlider.addEventListener('input', updateInputs);
 
+        // Reference Image Logic
+        const refImageInput = document.getElementById('ref-image-input');
+        const refOpacitySlider = document.getElementById('ref-opacity-slider');
+        const clearRefBtn = document.getElementById('clear-ref-btn');
+        let refImage = null;
+        let refOpacity = 0.3;
+
+        refImageInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    refImage = img;
+                    clearRefBtn.style.display = 'block';
+                    draw();
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+
+        refOpacitySlider.addEventListener('input', (e) => {
+            refOpacity = parseFloat(e.target.value);
+            draw();
+        });
+
+        clearRefBtn.addEventListener('click', () => {
+            refImage = null;
+            refImageInput.value = '';
+            clearRefBtn.style.display = 'none';
+            draw();
+        });
+
         // Interaction
         canvas.addEventListener('mousemove', (e) => {
             const rect = canvas.getBoundingClientRect();
@@ -353,6 +401,13 @@
         const draw = () => {
             ctx.fillStyle = '#0f172a';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Reference Image
+            if (refImage) {
+                ctx.globalAlpha = refOpacity;
+                ctx.drawImage(refImage, 0, 0, canvas.width, canvas.height);
+                ctx.globalAlpha = 1.0;
+            }
 
             // Minor Grid (Individual cells)
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
