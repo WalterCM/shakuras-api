@@ -14,3 +14,6 @@ hangul-names>=0.4.2,<0.5.0
 # Shell
 ipython>=8.14.0,<8.15.0
 
+# Testing
+pytest>=9.0.2
+pytest-django>=4.11.1
