@@ -52,14 +52,22 @@ class GatherAction(Action):
         actual_dist = max(0, dist - entity.radius - patch.radius)
         
         if actual_dist <= entity.range:
-            # Arrived at patch - try to claim it
+            # Arrived at patch - check if we should stay or look for a free one
             if patch.occupied_by is None or patch.occupied_by == entity.id:
+                # It's free! Claim it
                 patch.occupied_by = entity.id
                 self.phase = 'mining'
                 self.mining_cooldown = max(1, entity.harvest_time)
             else:
-                # Wait for it to be free
-                self.phase = 'mining'
+                # It's occupied. Can we find a completely free one nearby?
+                # This mirrors the "it checks the status only after reaching it" logic
+                better_patch_id = self._find_best_patch(entity, game_state, only_unoccupied=True)
+                if better_patch_id and better_patch_id != self.target_patch_id:
+                    self.target_patch_id = better_patch_id
+                    # We don't start mining immediately, we have to travel to the new one
+                else:
+                    # No free ones nearby? Just wait here (Saturation)
+                    self.phase = 'mining'
         else:
             # Keep moving
             move_dist = min(entity.speed, actual_dist - entity.range + 0.05)
@@ -115,31 +123,42 @@ class GatherAction(Action):
             game_state.add_minerals(entity.owner_id, entity.carrying)
             entity.carrying = 0
             self.phase = 'moving_to_patch'
-            # Check for better patch if current one is long-term crowded
-            new_patch_id = self._find_best_patch(entity, game_state)
-            if new_patch_id:
-                self.target_patch_id = new_patch_id
+            # Persistence: We no longer re-assign here. 
+            # We stick to our target_patch_id until we arrive and see it's blocked.
         else:
             # Keep moving
             move_dist = min(entity.speed, actual_dist - entity.range + 0.05)
             entity.pos += diff.normalize() * move_dist
     
-    def _find_best_patch(self, entity, game_state):
+    def _find_best_patch(self, entity, game_state, max_dist=30.0, only_unoccupied=False):
         """Find the best mineral patch considering distance and current worker assignments"""
         patches = [e for e in game_state.entities.values()
                   if e.type == 'mineral_patch' and e.hp > 0]
+        
+        # Locality: Filter by distance
+        if max_dist:
+            patches = [p for p in patches if entity.pos.dist_to(p.pos) <= max_dist]
+            
         if not patches:
             return None
             
         # Count current assignments
         assigned_counts = {}
-        for other in game_state.entities.items():
-            ent = other[1]
-            if ent.owner_id == entity.owner_id and ent.type == 'worker' and isinstance(ent.action, GatherAction):
-                tid = ent.action.target_patch_id
+        for other in game_state.entities.values():
+            if other.owner_id == entity.owner_id and other.type == 'worker' and isinstance(other.action, GatherAction):
+                tid = other.action.target_patch_id
                 assigned_counts[tid] = assigned_counts.get(tid, 0) + 1
         
-        # Sort by: (assignment count, square distance)
+        if only_unoccupied:
+            # Look for a patch with 0 active miners (occupied_by is None)
+            unoccupied = [p for p in patches if p.occupied_by is None]
+            if unoccupied:
+                # Pick the closest unoccupied one
+                best = min(unoccupied, key=lambda p: entity.pos.dist_to_sq(p.pos))
+                return best.id
+            return None
+
+        # Standard score: (assignment count, square distance)
         best = min(patches, key=lambda p: (assigned_counts.get(p.id, 0), entity.pos.dist_to_sq(p.pos)))
         return best.id
     

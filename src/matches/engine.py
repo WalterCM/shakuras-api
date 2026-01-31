@@ -231,8 +231,8 @@ class ProductionAI:
         for ent in simulator.entities.values():
             if ent.owner_id == self.player_id and ent.type == 'worker' and ent.status != 'dead':
                 if ent.action is None:
-                    # Find a job
-                    patch_id = GatherAction(None)._find_best_patch(ent, simulator)
+                    # Find a job (locally)
+                    patch_id = GatherAction(None)._find_best_patch(ent, simulator, max_dist=30.0)
                     if patch_id:
                         ent.action = GatherAction(patch_id)
 
@@ -305,7 +305,8 @@ class MatchSimulator:
         from .actions import GatherAction, AttackAction
         if entity.type == 'worker':
             # Use smart distribution (even for initial/produced workers)
-            patch_id = GatherAction(None)._find_best_patch(entity, self)
+            # Use max_dist=50 for initial spawns to accommodate slightly spread layouts
+            patch_id = GatherAction(None)._find_best_patch(entity, self, max_dist=50.0)
             if patch_id:
                 entity.action = GatherAction(patch_id)
         
