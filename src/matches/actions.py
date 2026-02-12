@@ -70,8 +70,7 @@ class GatherAction(Action):
                     self.phase = 'mining'
         else:
             # Keep moving
-            move_dist = min(entity.speed, actual_dist - entity.range + 0.05)
-            entity.pos += diff.normalize() * move_dist
+            entity.move_towards(patch.pos, game_state)
     
     def _mine(self, entity, game_state):
         patch = game_state.entities.get(self.target_patch_id)
@@ -127,9 +126,7 @@ class GatherAction(Action):
             # We stick to our target_patch_id until we arrive and see it's blocked.
         else:
             # Keep moving
-            move_dist = min(entity.speed, actual_dist - entity.range + 0.05)
-            entity.pos += diff.normalize() * move_dist
-    
+            entity.move_towards(closest_base.pos, game_state)
     def _find_best_patch(self, entity, game_state, max_dist=30.0, only_unoccupied=False):
         """Find the best mineral patch considering distance and current worker assignments"""
         patches = [e for e in game_state.entities.values()
@@ -202,8 +199,7 @@ class AttackAction(Action):
                 entity.current_cooldown = entity.cooldown
         else:
             # Move into range
-            move_dist = min(entity.speed, dist - entity.range + 0.1)
-            entity.pos += diff.normalize() * move_dist
+            entity.move_towards(target.pos, game_state)
     
     def get_status(self):
         return 'attack'
@@ -224,8 +220,7 @@ class MoveAction(Action):
             entity.action = None
         else:
             # Keep moving
-            move_dist = min(entity.speed, dist)
-            entity.pos += diff.normalize() * move_dist
+            entity.move_towards(self.destination, game_state)
     
     def get_status(self):
         return 'move'

@@ -53,6 +53,49 @@ class SpatialGrid:
                     nearby.extend(self.grid[cell])
         return nearby
 
+class NavigationGrid:
+    """Handles tile-based occupancy for pathfinding and collision avoidance."""
+    def __init__(self, width, height):
+        self.width = width
+        self.height = height
+        # Layer A: Static (Buildings/Minerals)
+        self.static_grid = [[None for _ in range(height)] for _ in range(width)]
+        # Layer B: Dynamic (Units)
+        self.dynamic_grid = [[None for _ in range(height)] for _ in range(width)]
+
+    def is_blocked(self, pos, check_dynamic=True, entity=None):
+        x, y = int(pos.x), int(pos.y)
+        if x < 0 or x >= self.width or y < 0 or y >= self.height:
+            return True # Edge of map
+        
+        # Static Layer
+        if self.static_grid[x][y] and (not entity or self.static_grid[x][y] != entity.id):
+            return True
+        
+        # Dynamic Layer
+        if check_dynamic and self.dynamic_grid[x][y] and (not entity or self.dynamic_grid[x][y] != entity.id):
+            return True
+        return False
+
+    def clear_dynamic(self):
+        for x in range(self.width):
+            for y in range(self.height):
+                self.dynamic_grid[x][y] = None
+
+    def set_static(self, x, y, entity_id):
+        if 0 <= x < self.width and 0 <= y < self.height:
+            self.static_grid[int(x)][int(y)] = entity_id
+
+    def set_dynamic(self, x, y, entity_id):
+        if 0 <= x < self.width and 0 <= y < self.height:
+            self.dynamic_grid[int(x)][int(y)] = entity_id
+
+    def get_obstacle_at(self, pos):
+        x, y = int(pos.x), int(pos.y)
+        if 0 <= x < self.width and 0 <= y < self.height:
+            return self.static_grid[x][y] or self.dynamic_grid[x][y]
+        return None
+
 class Entity:
     """Represents a single unit or building in the game world"""
     def __init__(self, unit_type, owner_id, x, y, entity_id=None):
@@ -86,6 +129,12 @@ class Entity:
         
         # Resource contention tracking
         self.occupied_by = None  # For mineral patches: ID of worker currently mining
+        
+        # Collision & Navigation
+        self.pos_memory = []
+        self.ghost_mode_ticks = 0
+        self.slide_direction = None # None, 'left', or 'right'
+        self.last_slide_normal = None
 
     def get_current_status(self, game_state=None):
         """Returns the status string from the current action or default"""
@@ -123,6 +172,154 @@ class Entity:
             self.carrying = 0 # Drop minerals on death
             self.production_queue = [] # Cancel production
 
+    def is_stuck_check(self):
+        """Monitors progress and activates ghosting if trapped."""
+        self.pos_memory.append(self.pos.copy())
+        if len(self.pos_memory) > 100:
+            self.pos_memory.pop(0)
+
+        if len(self.pos_memory) == 100:
+            from .actions import GatherAction
+            is_mining = isinstance(self.action, GatherAction) and self.action.phase == 'mining'
+            
+            dist_moved = self.pos.dist_to(self.pos_memory[0])
+            # High threshold (10.0) to ensure units trapped in small enclosures (like minerals) trigger it
+            if dist_moved < 10.0 and not is_mining:
+                # STUCK! Activate ghosting
+                self.ghost_mode_ticks = 20
+                self.pos_memory = [] # Reset memory
+
+    def move_towards(self, target_pos, game_state):
+        """Moves the entity towards a target position with grid-aware collision and sliding."""
+        if self.ghost_mode_ticks > 0:
+            self.ghost_mode_ticks -= 1
+            diff = target_pos - self.pos
+            dist = diff.length()
+            if dist > 0.01:
+                move_dist = min(self.speed, dist)
+                self.pos += diff.normalize() * move_dist
+            return
+
+        self.is_stuck_check()
+
+        diff = target_pos - self.pos
+        dist = diff.length()
+        if dist < 0.01:
+            return
+
+        direction = diff.normalize()
+        
+        # Probe ahead (at least speed distance)
+        probe_dist = max(1.0, self.speed)
+        probe_pos = self.pos + direction * probe_dist
+        
+        from .actions import GatherAction
+        am_gathering = isinstance(self.action, GatherAction)
+        
+        # Check Layer A (Static) and Layer B (Dynamic - if not gathering)
+        is_blocked = game_state.nav_grid.is_blocked(probe_pos, check_dynamic=not am_gathering, entity=self)
+        
+        # If we're currently sliding, check if we've cleared the obstacle
+        if self.slide_direction is not None:
+            # Exit slide mode if the direct path is now clear
+            if not is_blocked:
+                self.slide_direction = None
+                move_dist = min(self.speed, dist)
+                self.pos += direction * move_dist
+            else:
+                # Still blocked, keep sliding
+                self.slide_logic(target_pos, game_state)
+        elif is_blocked:
+            # First time hitting obstacle, enter slide mode
+            self.slide_logic(target_pos, game_state)
+        else:
+            # No obstacle, move directly
+            self.slide_direction = None
+            move_dist = min(self.speed, dist)
+            self.pos += direction * move_dist
+
+
+    def slide_logic(self, target_pos, game_state):
+        """Finds a tangent path around an obstacle and sticks to it."""
+        from .actions import GatherAction
+        am_gathering = isinstance(self.action, GatherAction)
+        
+        # Get original direction
+        orig_diff = target_pos - self.pos
+        orig_dir = orig_diff.normalize()
+        
+        # Try both tangents: Left and Right (90 degrees)
+        tangent_left = Vector2D(-orig_dir.y, orig_dir.x)
+        tangent_right = Vector2D(orig_dir.y, -orig_dir.x)
+        
+        def get_clearance(test_dir):
+            """Measures how many units we can move in a direction before hitting something."""
+            for step in range(1, 6): # Probe up to 5 units
+                p = self.pos + test_dir * step
+                if game_state.nav_grid.is_blocked(p, check_dynamic=not am_gathering, entity=self):
+                    return step - 1
+            return 10 # Path is relatively clear
+            
+        left_clear = get_clearance(tangent_left)
+        right_clear = get_clearance(tangent_right)
+
+        # Per-Tick Recovery: Stick to the chosen side but verify every tick.
+        # Switch only if the other side becomes significantly (>50%) better to prevent jitter.
+        if self.slide_direction is None:
+            # First time hitting wall: Choose a side
+            if left_clear == right_clear:
+                # Tie-breaker: Choose the side that's more aligned with reaching the goal
+                # Use dot product: higher value means more aligned
+                # Since tangents are perpendicular to goal direction, we check which one
+                # doesn't take us away from the goal
+                left_dot = tangent_left.x * orig_dir.x + tangent_left.y * orig_dir.y
+                right_dot = tangent_right.x * orig_dir.x + tangent_right.y * orig_dir.y
+                
+                # Choose the tangent with the higher (less negative) dot product
+                # This picks the direction that's less perpendicular to the goal
+                self.slide_direction = 'left' if left_dot >= right_dot else 'right'
+            else:
+                self.slide_direction = 'left' if left_clear >= right_clear else 'right'
+        else:
+            if self.slide_direction == 'left' and right_clear > left_clear * 1.5 and right_clear > 2:
+                self.slide_direction = 'right'
+            elif self.slide_direction == 'right' and left_clear > right_clear * 1.5 and left_clear > 2:
+                self.slide_direction = 'left'
+        
+        # Move in chosen direction
+        chosen_dir = tangent_left if self.slide_direction == 'left' else tangent_right
+        
+        # The Arc Cheat (Contour Following / Wall Hugging) / Rotation to find opening
+        if game_state.nav_grid.is_blocked(self.pos + chosen_dir * 0.5, check_dynamic=not am_gathering, entity=self):
+            found_path = False
+            for angle_deg in [45, 135, 180]:
+                rad = math.radians(angle_deg if self.slide_direction == 'left' else -angle_deg)
+                test_dir = Vector2D(
+                    orig_dir.x * math.cos(rad) - orig_dir.y * math.sin(rad),
+                    orig_dir.x * math.sin(rad) + orig_dir.y * math.cos(rad)
+                )
+                if not game_state.nav_grid.is_blocked(self.pos + test_dir * 0.5, check_dynamic=not am_gathering, entity=self):
+                    chosen_dir = test_dir
+                    found_path = True
+                    break
+            
+            if not found_path:
+                self.slide_direction = 'right' if self.slide_direction == 'left' else 'left'
+                chosen_dir = tangent_left if self.slide_direction == 'left' else tangent_right
+
+        # Move along the wall - carefully probe to avoid jumping into walls
+        move_dist = self.speed
+        step = 0.1
+        safe_dist = 0
+        for d in range(1, int(move_dist / step) + 1):
+            test_pos = self.pos + chosen_dir * (d * step)
+            if game_state.nav_grid.is_blocked(test_pos, check_dynamic=not am_gathering, entity=self):
+                break
+            safe_dist = d * step
+            
+        if safe_dist > 0:
+            self.pos += chosen_dir * safe_dist
+
     def update(self, game_state):
         """Update entity state based on current logic"""
         if self.status == 'dead':
@@ -136,65 +333,9 @@ class Entity:
         if self.action:
             self.action.update(self, game_state)
         
+        # Handle production if this is a producer
         if self.production_queue:
             self._handle_production(game_state)
-            
-        # 3. Soft Collision (Repulsion)
-        if self.type not in ['base', 'mineral_patch']:
-            self._apply_repulsion(game_state)
-
-    def _apply_repulsion(self, game_state):
-        """Pushes away from nearby entities to prevent overlapping"""
-        nearby_ids = game_state.grid.get_nearby_ids(self.pos)
-        
-        from .actions import GatherAction
-        am_gathering = isinstance(self.action, GatherAction)
-        
-        # Pre-calculate my radius to avoid repeated access if significant
-        my_radius = self.radius
-        
-        for other_id in nearby_ids:
-            if other_id == self.id:
-                continue
-            other = game_state.entities.get(other_id)
-            if not other or other.status == 'dead':
-                continue
-            
-            # WORKER GHOSTING: 
-            # Workers assigned to minerals ignore collision with buildings 
-            # and other gathering workers to prevent gridlocks.
-            if am_gathering:
-                if other.type in ['base', 'mineral_patch']:
-                    continue
-                if other.type == 'worker' and isinstance(other.action, GatherAction):
-                    continue
-                
-            # If both are buildings, they don't push each other
-            if self.type in ['base', 'mineral_patch'] and other.type in ['base', 'mineral_patch']:
-                continue
-
-            diff = self.pos - other.pos
-            dist_sq = diff.length_sq()
-            min_dist = my_radius + other.radius
-            
-            if dist_sq < min_dist**2:
-                # Push factor (softness)
-                # Buildings push units VERY strongly
-                push_factor = 0.8 if other.type in ['base', 'mineral_patch', 'building'] else 0.2
-                
-                if dist_sq > 0.001:
-                    dist = math.sqrt(dist_sq)
-                    overlap = min_dist - dist
-                    # Directly adjust pos to save on Vector2D creation if needed, 
-                    # but normalize returns a new vector anyway.
-                    push = diff.normalize() * (overlap * push_factor)
-                    self.pos += push
-                else:
-                    # Deterministic push for perfectly stacked units
-                    angle = (hash(self.id + other_id) % 360) * (math.pi / 180)
-                    push_dist = min_dist * push_factor
-                    self.pos.x += math.cos(angle) * push_dist
-                    self.pos.y += math.sin(angle) * push_dist
 
 
     def _handle_production(self, game_state):
@@ -266,6 +407,7 @@ class MatchSimulator:
             self.player2_id: 50.0
         }
         self.grid = SpatialGrid(self.map_data.width, self.map_data.height)
+        self.nav_grid = NavigationGrid(self.map_data.width, self.map_data.height)
         self.ai_controllers = [
             ProductionAI(self.player1_id),
             ProductionAI(self.player2_id)
@@ -301,6 +443,13 @@ class MatchSimulator:
     def _spawn_entity(self, entity):
         self.entities[entity.id] = entity
         
+        # Update Nav Grid for buildings/minerals
+        if entity.type in ['base', 'mineral_patch']:
+            bx, by = int(entity.pos.x - entity.width/2), int(entity.pos.y - entity.height/2)
+            for ox in range(entity.width):
+                for oy in range(entity.height):
+                    self.nav_grid.set_static(bx + ox, by + oy, entity.id)
+
         # Assign default actions to newly spawned units
         from .actions import GatherAction, AttackAction
         if entity.type == 'worker':
@@ -365,12 +514,19 @@ class MatchSimulator:
             # 1. Update Controllers
             for ai in self.ai_controllers:
                 ai.update(self)
-            # 2. Prepare Spatial Search
+            # 2. Prepare Spatial Search & Nav Grid
             self.grid.clear()
+            self.nav_grid.clear_dynamic()
             for ent in self.entities.values():
                 if ent.status != 'dead':
                     self.grid.insert(ent)
-
+                    if ent.type not in ['base', 'mineral_patch']:
+                        self.nav_grid.set_dynamic(ent.pos.x, ent.pos.y, ent.id)
+            
+            # Clean up static grid for depleted minerals
+            # (In a real engine we'd do this on death, but here we can refresh if needed)
+            # Actually minerals don't move, so we only need to clear if they die.
+            
             # 3. Capture Snapshots for delta calculation
             pre_update_snapshots = {eid: ent.to_dict(self) for eid, ent in self.entities.items()}
             old_resources = self.resources.copy()
