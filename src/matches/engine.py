@@ -141,9 +141,14 @@ class Entity:
         if self.action:
             try:
                 # Some actions might not take game_state yet, but GatherAction does
-                return self.action.get_status(self, game_state)
-            except TypeError:
-                return self.action.get_status()
+                # Only pass game_state if it's not None
+                if game_state is not None:
+                    return self.action.get_status(self, game_state)
+                else:
+                    return self.action.get_status()
+            except (TypeError, AttributeError):
+                # Action doesn't support get_status or requires different args
+                return self.status
         return self.status
 
     def to_dict(self, game_state=None):
@@ -191,6 +196,15 @@ class Entity:
 
     def move_towards(self, target_pos, game_state):
         """Moves the entity towards a target position with grid-aware collision and sliding."""
+        # Backward compatibility: if no nav_grid, just move directly
+        if not hasattr(game_state, 'nav_grid') or game_state.nav_grid is None:
+            diff = target_pos - self.pos
+            dist = diff.length()
+            if dist > 0.01:
+                move_dist = min(self.speed, dist)
+                self.pos += diff.normalize() * move_dist
+            return
+
         if self.ghost_mode_ticks > 0:
             self.ghost_mode_ticks -= 1
             diff = target_pos - self.pos
@@ -227,16 +241,60 @@ class Entity:
                 move_dist = min(self.speed, dist)
                 self.pos += direction * move_dist
             else:
-                # Still blocked, keep sliding
+                # Still blocked, try gap detection first
+                gap_pos = self.find_gap(target_pos, game_state)
+                if gap_pos is not None:
+                    # Head toward the gap
+                    gap_dir = gap_pos - self.pos
+                    if gap_dir.length() > 0.1:
+                        move_dir = gap_dir.normalize()
+                        move_dist = min(self.speed, gap_dir.length())
+                        # Verify the move is safe
+                        test_pos = self.pos + move_dir * move_dist
+                        if not game_state.nav_grid.is_blocked(test_pos, check_dynamic=not am_gathering, entity=self):
+                            self.pos += move_dir * move_dist
+                            self.slide_direction = None
+                            return
+                # No gap or gap unreachable, keep sliding
                 self.slide_logic(target_pos, game_state)
         elif is_blocked:
-            # First time hitting obstacle, enter slide mode
+            # First time hitting obstacle, try gap detection first
+            gap_pos = self.find_gap(target_pos, game_state)
+            if gap_pos is not None:
+                # Head toward the gap
+                gap_dir = gap_pos - self.pos
+                if gap_dir.length() > 0.1:
+                    move_dir = gap_dir.normalize()
+                    move_dist = min(self.speed, gap_dir.length())
+                    # Verify the move is safe
+                    test_pos = self.pos + move_dir * move_dist
+                    if not game_state.nav_grid.is_blocked(test_pos, check_dynamic=not am_gathering, entity=self):
+                        self.pos += move_dir * move_dist
+                        return
+            # No gap found, enter slide mode
             self.slide_logic(target_pos, game_state)
         else:
             # No obstacle, move directly
             self.slide_direction = None
             move_dist = min(self.speed, dist)
             self.pos += direction * move_dist
+
+    def find_gap(self, target_pos, game_state):
+        """Cast ray toward target, find first opening within range."""
+        from .actions import GatherAction
+        am_gathering = isinstance(self.action, GatherAction)
+        
+        direction = (target_pos - self.pos).normalize()
+        
+        # Scan along the ray toward target for first opening
+        for dist in range(1, 11):  # Check up to 10 tiles ahead
+            check_pos = self.pos + direction * dist
+            
+            if not game_state.nav_grid.is_blocked(check_pos, check_dynamic=not am_gathering, entity=self):
+                # Found opening! Return position to head toward
+                return check_pos
+        
+        return None  # No gap found within range
 
 
     def slide_logic(self, target_pos, game_state):
@@ -336,6 +394,62 @@ class Entity:
         # Handle production if this is a producer
         if self.production_queue:
             self._handle_production(game_state)
+
+        # Soft Collision (Repulsion)
+        if self.type not in ['base', 'mineral_patch']:
+            self._apply_repulsion(game_state)
+
+    def _apply_repulsion(self, game_state):
+        """Pushes away from nearby entities to prevent overlapping"""
+        if not hasattr(game_state, 'grid'):
+            return
+            
+        nearby_ids = game_state.grid.get_nearby_ids(self.pos)
+        
+        from .actions import GatherAction
+        am_gathering = isinstance(self.action, GatherAction)
+        
+        my_radius = self.radius
+        
+        for other_id in nearby_ids:
+            if other_id == self.id:
+                continue
+            other = game_state.entities.get(other_id)
+            if not other or other.status == 'dead':
+                continue
+            
+            # WORKER GHOSTING: 
+            # Workers assigned to minerals ignore collision with buildings 
+            # and other gathering workers to prevent gridlocks.
+            if am_gathering:
+                if other.type in ['base', 'mineral_patch']:
+                    continue
+                if other.type == 'worker' and isinstance(other.action, GatherAction):
+                    continue
+                
+            # If both are buildings, they don't push each other
+            if self.type in ['base', 'mineral_patch'] and other.type in ['base', 'mineral_patch']:
+                continue
+
+            diff = self.pos - other.pos
+            dist_sq = diff.length_sq()
+            min_dist = my_radius + other.radius
+            
+            if dist_sq < min_dist**2:
+                # Push factor (softness)
+                push_factor = 0.8 if other.type in ['base', 'mineral_patch', 'building'] else 0.2
+                
+                if dist_sq > 0.001:
+                    dist = math.sqrt(dist_sq)
+                    overlap = min_dist - dist
+                    push = diff.normalize() * (overlap * push_factor)
+                    self.pos += push
+                else:
+                    # Deterministic push for perfectly stacked units
+                    angle = (hash(self.id + other_id) % 360) * (math.pi / 180)
+                    push_dist = min_dist * push_factor
+                    self.pos.x += math.cos(angle) * push_dist
+                    self.pos.y += math.sin(angle) * push_dist
 
 
     def _handle_production(self, game_state):

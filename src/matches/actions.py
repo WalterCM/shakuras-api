@@ -67,7 +67,9 @@ class GatherAction(Action):
                     # We don't start mining immediately, we have to travel to the new one
                 else:
                     # No free ones nearby? Just wait here (Saturation)
-                    self.phase = 'mining'
+                    # Stay in 'moving_to_patch' phase so it shows as 'harvest' status
+                    # but don't move - waiting for patch to free up
+                    pass
         else:
             # Keep moving
             entity.move_towards(patch.pos, game_state)
@@ -159,13 +161,14 @@ class GatherAction(Action):
         best = min(patches, key=lambda p: (assigned_counts.get(p.id, 0), entity.pos.dist_to_sq(p.pos)))
         return best.id
     
-    def get_status(self, entity, game_state):
+    def get_status(self, entity=None, game_state=None):
         if self.phase == 'moving_to_patch':
             return 'harvest'
         elif self.phase == 'mining':
-            patch = game_state.entities.get(self.target_patch_id)
-            if patch and patch.occupied_by is not None and patch.occupied_by != entity.id:
-                return 'waiting'
+            if game_state is not None:
+                patch = game_state.entities.get(self.target_patch_id)
+                if patch and patch.occupied_by is not None and patch.occupied_by != entity.id:
+                    return 'waiting'
             return 'mining'
         elif self.phase == 'returning':
             return 'return'

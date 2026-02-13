@@ -210,12 +210,15 @@ class HarvestingTests(TestCase):
         
         self.assertEqual(patch.occupied_by, w1.id)
         
-        # W2 tries but should stop (no action)
+        # W2 tries but should wait (action still exists, but not moving)
+        # It stays in 'moving_to_patch' phase waiting for patch to free up
         for _ in range(5):
             if w2.action:
                 w2.action.update(w2, gs)
         
-        self.assertIsNone(w2.action)
+        # Worker should still have an action (waiting, not stopped)
+        self.assertIsNotNone(w2.action)
+        self.assertEqual(w2.action.phase, 'moving_to_patch')
 
     def test_simultaneous_patch_access(self):
         """Test two workers trying to mine same patch simultaneously"""
