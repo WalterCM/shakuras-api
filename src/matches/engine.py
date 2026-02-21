@@ -282,21 +282,106 @@ class Entity:
             self.pos += direction * move_dist
 
     def find_gap(self, target_pos, game_state):
-        """Cast ray toward target, find first opening within range."""
+        """Find first opening (gap) in the obstacle in direction of target.
+        Looks for navigable tiles that come right after blocked tiles."""
         from .actions import GatherAction
         am_gathering = isinstance(self.action, GatherAction)
         
+        # 1. Buscar en rayo directo hacia el objetivo
+        gap = self._scan_ray(target_pos, game_state, am_gathering)
+        if gap:
+            return gap
+        
+        # 2. Buscar gaps horizontales: tiles navegables que están después de tiles bloqueados
+        # Buscar hacia la derecha
+        for dx in range(1, 15):
+            for dy in range(-10, 11):
+                check_pos = Vector2D(self.pos.x + dx, self.pos.y + dy)
+                
+                # Este tile debe ser navegable
+                if game_state.nav_grid.is_blocked(check_pos, check_dynamic=not am_gathering, entity=self):
+                    continue
+                
+                # El tile inmediatamente a la izquierda debe ser BLOQUEADO
+                prev_pos = Vector2D(self.pos.x + dx - 1, self.pos.y + dy)
+                if not game_state.nav_grid.is_blocked(prev_pos, check_dynamic=not am_gathering, entity=self):
+                    continue
+                
+                # Este es un gap horizontal! Verificar que acerca al objetivo
+                if check_pos.dist_to(target_pos) < self.pos.dist_to(target_pos):
+                    return check_pos
+        
+        # Buscar hacia la izquierda
+        for dx in range(1, 15):
+            for dy in range(-10, 11):
+                check_pos = Vector2D(self.pos.x - dx, self.pos.y + dy)
+                
+                if game_state.nav_grid.is_blocked(check_pos, check_dynamic=not am_gathering, entity=self):
+                    continue
+                
+                prev_pos = Vector2D(self.pos.x - dx + 1, self.pos.y + dy)
+                if not game_state.nav_grid.is_blocked(prev_pos, check_dynamic=not am_gathering, entity=self):
+                    continue
+                
+                if check_pos.dist_to(target_pos) < self.pos.dist_to(target_pos):
+                    return check_pos
+        
+        # Buscar gaps verticales
+        # Buscar hacia abajo
+        for dy in range(1, 15):
+            for dx in range(-10, 11):
+                check_pos = Vector2D(self.pos.x + dx, self.pos.y + dy)
+                
+                if game_state.nav_grid.is_blocked(check_pos, check_dynamic=not am_gathering, entity=self):
+                    continue
+                
+                prev_pos = Vector2D(self.pos.x + dx, self.pos.y + dy - 1)
+                if not game_state.nav_grid.is_blocked(prev_pos, check_dynamic=not am_gathering, entity=self):
+                    continue
+                
+                if check_pos.dist_to(target_pos) < self.pos.dist_to(target_pos):
+                    return check_pos
+        
+        # Buscar hacia arriba
+        for dy in range(1, 15):
+            for dx in range(-10, 11):
+                check_pos = Vector2D(self.pos.x + dx, self.pos.y - dy)
+                
+                if game_state.nav_grid.is_blocked(check_pos, check_dynamic=not am_gathering, entity=self):
+                    continue
+                
+                prev_pos = Vector2D(self.pos.x + dx, self.pos.y - dy + 1)
+                if not game_state.nav_grid.is_blocked(prev_pos, check_dynamic=not am_gathering, entity=self):
+                    continue
+                
+                if check_pos.dist_to(target_pos) < self.pos.dist_to(target_pos):
+                    return check_pos
+        
+        return None
+
+    def _scan_ray(self, target_pos, game_state, am_gathering):
+        """Escanea desde posición actual hacia objetivo, retorna primer gap."""
         direction = (target_pos - self.pos).normalize()
         
-        # Scan along the ray toward target for first opening
-        for dist in range(1, 11):  # Check up to 10 tiles ahead
+        for dist in range(1, 15):
             check_pos = self.pos + direction * dist
             
             if not game_state.nav_grid.is_blocked(check_pos, check_dynamic=not am_gathering, entity=self):
-                # Found opening! Return position to head toward
                 return check_pos
         
-        return None  # No gap found within range
+        return None
+
+    def _scan_ray(self, target_pos, game_state, am_gathering):
+        """Escanea desde posición actual hacia objetivo, retorna primer gap."""
+        direction = (target_pos - self.pos).normalize()
+        
+        for dist in range(1, 11):  # hasta 10 tiles ahead
+            check_pos = self.pos + direction * dist
+            
+            if not game_state.nav_grid.is_blocked(check_pos, check_dynamic=not am_gathering, entity=self):
+                return check_pos
+        
+        return None
 
 
     def slide_logic(self, target_pos, game_state):
@@ -506,12 +591,11 @@ class MatchSimulator:
         if map_instance:
             self.map_data = map_instance
         else:
-            # Fallback for compatibility/tests
-            from .models import Map
+            # Default map
             self.map_data = Map(
                 width=128, 
                 height=128, 
-                spawn_points={'p1': {'x': 10, 'y': 10}, 'p2': {'x': 118, 'y': 118}},
+                spawn_points={'p1': Vector2D(10, 10), 'p2': Vector2D(118, 118)},
                 minerals=[]
             )
 
@@ -587,7 +671,12 @@ class MatchSimulator:
     def _setup_initial_entities(self):
         # 1. Minerals FIRST from Map data so workers can find them
         for m in self.map_data.minerals:
-            patch = Entity('mineral_patch', 'neutral', m['x'], m['y'])
+            # Support both dict {x, y} and Vector2D
+            if hasattr(m, 'x'):
+                mx, my = m.x, m.y
+            else:
+                mx, my = m['x'], m['y']
+            patch = Entity('mineral_patch', 'neutral', mx, my)
             # Center it: (x, y) from editor is top-left
             patch.pos.x += patch.width / 2.0
             patch.pos.y += patch.height / 2.0
@@ -596,7 +685,12 @@ class MatchSimulator:
         # 2. Spawns (Bases)
         spawns = self.map_data.spawn_points
         for pid, pos in spawns.items():
-            base = Entity('base', pid, pos['x'], pos['y'])
+            # Support both dict {x, y} and Vector2D
+            if hasattr(pos, 'x'):
+                px, py = pos.x, pos.y
+            else:
+                px, py = pos['x'], pos['y']
+            base = Entity('base', pid, px, py)
             # Center it: (x, y) from editor is top-left
             base.pos.x += base.width / 2.0
             base.pos.y += base.height / 2.0

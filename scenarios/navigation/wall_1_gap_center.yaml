@@ -4,7 +4,8 @@
 name: "Wall 1 gap center"
 description: "Worker trying to cross mineral wall with 1 gap at center"
 
-base_map: bloodbath
+width: 64
+height: 64
 
 entities:
   - id: worker1
@@ -12,48 +13,103 @@ entities:
     owner: p1
     x: 10
     y: 15
-
-    extra_minerals:
-      # Wall below gap (y=5 to y=14)
-      - x: 30
-        y: 5
-      - x: 30
-        y: 6
-      - x: 30
-        y: 7
-      - x: 30
-        y: 8
-      - x: 30
-        y: 9
-      - x: 30
-        y: 10
-      - x: 30
-        y: 11
-      - x: 30
-        y: 12
-      - x: 30
-        y: 13
-      - x: 30
-        y: 14
-      # Wall above gap (y=16 to y=25)
-      - x: 30
-        y: 16
-      - x: 30
-        y: 17
-      - x: 30
-        y: 18
-      - x: 30
-        y: 19
-      - x: 30
-        y: 20
-      - x: 30
-        y: 21
-      - x: 30
-        y: 22
-      - x: 30
-        y: 23
-      - x: 30
-        y: 24
+  # Wall below gap (y=5 to y=14)
+  - id: m1
+    type: mineral_patch
+    owner: neutral
+    x: 30
+    y: 5
+  - id: m2
+    type: mineral_patch
+    owner: neutral
+    x: 30
+    y: 6
+  - id: m3
+    type: mineral_patch
+    owner: neutral
+    x: 30
+    y: 7
+  - id: m4
+    type: mineral_patch
+    owner: neutral
+    x: 30
+    y: 8
+  - id: m5
+    type: mineral_patch
+    owner: neutral
+    x: 30
+    y: 9
+  - id: m6
+    type: mineral_patch
+    owner: neutral
+    x: 30
+    y: 10
+  - id: m7
+    type: mineral_patch
+    owner: neutral
+    x: 30
+    y: 11
+  - id: m8
+    type: mineral_patch
+    owner: neutral
+    x: 30
+    y: 12
+  - id: m9
+    type: mineral_patch
+    owner: neutral
+    x: 30
+    y: 13
+  - id: m10
+    type: mineral_patch
+    owner: neutral
+    x: 30
+    y: 14
+  # Wall above gap (y=16 to y=25)
+  - id: m11
+    type: mineral_patch
+    owner: neutral
+    x: 30
+    y: 16
+  - id: m12
+    type: mineral_patch
+    owner: neutral
+    x: 30
+    y: 17
+  - id: m13
+    type: mineral_patch
+    owner: neutral
+    x: 30
+    y: 18
+  - id: m14
+    type: mineral_patch
+    owner: neutral
+    x: 30
+    y: 19
+  - id: m15
+    type: mineral_patch
+    owner: neutral
+    x: 30
+    y: 20
+  - id: m16
+    type: mineral_patch
+    owner: neutral
+    x: 30
+    y: 21
+  - id: m17
+    type: mineral_patch
+    owner: neutral
+    x: 30
+    y: 22
+  - id: m18
+    type: mineral_patch
+    owner: neutral
+    x: 30
+    y: 23
+  - id: m19
+    type: mineral_patch
+    owner: neutral
+    x: 30
+    y: 24
 
 triggers:
   - tick: 0

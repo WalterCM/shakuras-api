@@ -1,8 +1,11 @@
 import pytest
 from django.urls import reverse
-from matches.models import Map
-from matches.engine import MatchSimulator
+from matches.engine import MatchSimulator, Map as EngineMap
 from players.models import Player
+from matches.loader import MAPS_DIR
+import yaml
+from pathlib import Path
+
 
 @pytest.mark.django_db
 class TestMapEditor:
@@ -19,20 +22,8 @@ class TestMapEditor:
         assert response.status_code == 200
         assert b"Map Editor" in response.content
 
-    def test_map_creation(self):
-        """Test creating a Map model instance"""
-        m = Map.objects.create(
-            name="Test Arena",
-            width=100,
-            height=100,
-            spawn_points={'p1': {'x': 5, 'y': 5}, 'p2': {'x': 95, 'y': 95}},
-            minerals=[{'x': 50, 'y': 50}]
-        )
-        assert m.name == "Test Arena"
-        assert m.spawn_points['p1']['x'] == 5
-
     def test_save_map_api(self, client):
-        """Test the save_map_view API endpoint"""
+        """Test the save_map_view API endpoint creates a YAML file"""
         url = reverse('matches:save-map')
         payload = {
             'name': 'API Map',
@@ -44,22 +35,31 @@ class TestMapEditor:
         response = client.post(url, data=payload, content_type='application/json')
         assert response.status_code == 200
         assert response.json()['status'] == 'ok'
-        assert Map.objects.filter(name='API Map').exists()
+        # Verify file was created
+        map_path = MAPS_DIR / 'api_map.yaml'
+        assert map_path.exists()
+        # Cleanup
+        if map_path.exists():
+            map_path.unlink()
 
-    def test_simulator_with_map(self, player_factory):
-        """Test that MatchSimulator correctly uses Map data"""
+    def test_simulator_with_engine_map(self, player_factory):
+        """Test that MatchSimulator correctly uses EngineMap data"""
         p1 = player_factory("P1")
         p2 = player_factory("P2")
         
-        m = Map.objects.create(
+        from matches.utils import Vector2D
+        engine_map = EngineMap(
             name="Sim Map",
             width=200,
             height=200,
-            spawn_points={'p1': {'x': 10, 'y': 10}, 'p2': {'x': 190, 'y': 190}},
+            spawn_points={
+                'p1': Vector2D(10, 10),
+                'p2': Vector2D(190, 190)
+            },
             minerals=[{'x': 100, 'y': 100}]
         )
         
-        sim = MatchSimulator(p1, p2, map_instance=m, max_ticks=10)
+        sim = MatchSimulator(p1, p2, map_instance=engine_map, max_ticks=10)
         history = sim.simulate()
         
         # Verify map dimensions and tick 0 entities

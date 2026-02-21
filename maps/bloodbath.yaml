@@ -1,0 +1,28 @@
+name: "Blood Bath"
+description: "Classic 2-player map with mineral patches"
+width: 64
+height: 64
+
+spawn_points:
+  p1: {x: 2, y: 6}
+  p2: {x: 53, y: 55}
+
+entities:
+  - id: m1
+    type: mineral_patch
+    owner: neutral
+    x: 0
+    y: 2
+  - id: m2
+    type: mineral_patch
+    owner: neutral
+    x: 1
+    y: 1
+  - id: m3
+    type: mineral_patch
+    owner: neutral
+    x: 4
+    y: 2
+
+config:
+  max_ticks: 500

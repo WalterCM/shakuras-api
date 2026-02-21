@@ -3,25 +3,9 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericForeignKey
 
 
-class Map(models.Model):
-    """Stores a map layout including dimensions, spawns, and minerals"""
-    name = models.CharField(max_length=255)
-    width = models.PositiveIntegerField(default=128)
-    height = models.PositiveIntegerField(default=128)
-    # List of {x, y, type: 'p1'|'p2'|'neutral'}
-    spawn_points = models.JSONField(default=dict)
-    # List of {x, y}
-    minerals = models.JSONField(default=list)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return self.name
-
-
 class Match(models.Model):
     date = models.DateTimeField()
-    map = models.ForeignKey(Map, on_delete=models.SET_NULL, null=True, related_name='matches')
+    map_name = models.CharField(max_length=255, default='bloodbath')
 
     class STATUS:
         IDLE = 'idle'

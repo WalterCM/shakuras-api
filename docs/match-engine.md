@@ -4,36 +4,25 @@ Motor de simulación de partidas RTS estilo StarCraft: BroodWar.
 
 ## Estado Actual
 
-**Implementado:**
+### Implementado
 - Sistema de física (movimiento, colisión, pathfinding)
 - Sistema de acciones (Gather, Attack, Move, Hold)
 - Sistema de producción de unidades (cola en buildings)
 - Replay con deltas JSON
 - Tests unitarios para cada sistema
-- Ubicación: `src/matches/` dentro del proyecto Django
+- Sistema de escenarios YAML para testing
 
-**Faltante (prioridad alta):**
+### Faltante (prioridad alta)
 - Sistema de rendición automática
 - Lógica de victoria/derrota (todos los edificios destruidos)
-- Guardar replay completo en DB
+- IA básica funcional
 - Unidad Medic
+- Guardar replay completo en DB
 
-**Faltante (prioridad media):**
+### Faltante (prioridad media)
 - Más tipos de unidades (SCV, Probe, Drone, Dragoon, Hydra, Mutalisk)
 - Sistema de highlights para replay
-- Integración con API Django
 - Botón "Guardar como Replay" en visualizador de escenarios
-
-**Completado:**
-- Sistema de física (movimiento, colisión, pathfinding)
-- Sistema de acciones (Gather, Attack, Move, Hold)
-- Sistema de producción de unidades (cola en buildings)
-- Replay con deltas JSON
-- Tests unitarios para cada sistema
-- Ubicación: `src/matches/` dentro del proyecto Django
-- Sistema de escenarios YAML (`src/matches/scenario.py`)
-- Visualizador de escenarios (`scenarios/`)
-- Endpoint para cargar y ejecutar escenarios
 
 ## Arquitectura
 
@@ -45,6 +34,7 @@ Motor de simulación de partidas RTS estilo StarCraft: BroodWar.
 | `actions.py` | Acciones de unidades: GatherAction, AttackAction, MoveAction, HoldAction |
 | `data.py` | Stats de unidades (hp, damage, range, speed, cost, etc.) |
 | `utils.py` | Utilidades (Vector2D) |
+| `scenario.py` | Loader de escenarios YAML |
 
 ### Componentes Principales
 
@@ -85,6 +75,58 @@ MoveAction(Vector2D(x, y))
 HoldAction()
 ```
 
+## Sistema de Escenarios YAML
+
+Permite crear escenarios de prueba para verificar el funcionamiento del motor sin necesidad de guardar en la base de datos.
+
+### Ubicación
+- `scenarios/` - Archivos YAML de escenarios
+- `src/matches/scenario.py` - Módulo loader
+- `src/matches/templates/matches/scenario_visualizer.html` - Visualizador
+
+### Formato YAML
+```yaml
+name: "Nombre del escenario"
+description: "Descripción"
+
+base_map: bloodbath  # Mapa base de la DB (opcional)
+
+entities:
+  - id: worker1
+    type: worker
+    owner: p1
+    x: 10
+    y: 15
+    
+    extra_minerals:  # Minerales adicionales del escenario
+      - x: 30
+        y: 5
+
+triggers:
+  - tick: 0
+    entity: worker1
+    action:
+      type: move
+      target: {x: 50, y: 15}
+
+config:
+  max_ticks: 100
+```
+
+### Escenarios Existentes
+- `scenarios/navigation/wall_0_gaps.yaml` - Pared sólida
+- `scenarios/navigation/wall_1_gap_center.yaml` - 1 gap al centro
+- `scenarios/navigation/wall_1_gap_offset.yaml` - 1 gap desplazado
+- `scenarios/navigation/wall_2_gaps.yaml` - 2 gaps
+- `scenarios/navigation/l_shape.yaml` - Esquina en L
+
+### Diseño: Map vs Entities
+
+El modelo de Map usa `minerals` (lista simple de {x,y}) en vez de `entities` genérico. Esto es por simplicidad:
+- El mapa define solo minerals (geysers se agregarán después)
+- Los workers y buildings se crean automáticamente en los spawn points
+- Los escenarios pueden agregar minerals adicionales vía `extra_minerals`
+
 ## Unidades Actuales (en data.py)
 
 | Tipo | HP | Dmg | Range | Speed | Cost | Build Time |
@@ -119,11 +161,18 @@ Ticks posteriores solo contienen cambios (deltas).
 - `test_combat.py` - Mecánicas de combate
 - `test_harvesting.py` - Sistema de minería
 - `test_movement.py` - Movimiento de unidades
-- `test_navigation.py` - Pathfinding y colisiones
+- `test_navigation.py` - Pathfinding y colisiones (10 tests)
 - `test_collision.py` - Detección de colisiones
 - `test_production.py` - Producción de unidades
 - `test_entity.py` - Entidades individuales
 - `test_map_editor.py` - Editor de mapas
+
+## Aprendices del Desarrollo
+
+### Posicionamiento de entidades
+- Minerals y buildings se posicionan en `x + 0.5`, `y + 0.5`
+- Esto afecta el bloqueo en el NavigationGrid
+- Importante para que el pathfinding funcione correctamente
 
 ## Próximos Pasos para MVP Terran vs Terran
 

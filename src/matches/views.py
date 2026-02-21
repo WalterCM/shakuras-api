@@ -7,9 +7,10 @@ from django.core.files.uploadedfile import UploadedFile
 import json
 import yaml
 from rest_framework import viewsets, permissions
-from matches.models import Match, Map
+from matches.models import Match
 from matches import serializers
 from matches.scenario import list_scenarios, run_scenario_from_file, SCENARIOS_DIR
+from matches.loader import load_map, get_maps_list
 
 
 class MatchViewSet(viewsets.ModelViewSet):
@@ -38,18 +39,29 @@ class MapEditorView(TemplateView):
 
 @csrf_exempt
 def save_map_view(request):
-    """API endpoint to save a new map layout"""
+    """API endpoint to save a new map layout to file"""
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
-            new_map = Map.objects.create(
-                name=data.get('name', 'New Map'),
-                width=data.get('width', 128),
-                height=data.get('height', 128),
-                spawn_points=data.get('spawn_points', {}),
-                minerals=data.get('minerals', [])
-            )
-            return JsonResponse({'status': 'ok', 'id': new_map.id})
+            # Save to maps/ directory
+            from pathlib import Path
+            from matches.loader import MAPS_DIR
+            
+            map_name = data.get('name', 'New Map').replace(' ', '_').lower()
+            map_path = MAPS_DIR / f"{map_name}.yaml"
+            
+            yaml_content = {
+                'name': data.get('name', 'New Map'),
+                'width': data.get('width', 128),
+                'height': data.get('height', 128),
+                'spawn_points': data.get('spawn_points', {}),
+                'minerals': data.get('minerals', []),
+            }
+            
+            with open(map_path, 'w') as f:
+                yaml.dump(yaml_content, f)
+            
+            return JsonResponse({'status': 'ok', 'path': str(map_path)})
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
     return JsonResponse({'status': 'error', 'message': 'Only POST allowed'}, status=405)
@@ -107,24 +119,9 @@ def run_scenario_upload_api(request):
             # Load YAML from uploaded file
             scenario_data = yaml.safe_load(yaml_file)
             
-            # Get base map from DB if specified
-            map_data = None
-            if 'base_map' in scenario_data:
-                try:
-                    map_model = Map.objects.get(name__iexact=scenario_data['base_map'])
-                    map_data = {
-                        'name': map_model.name,
-                        'width': map_model.width,
-                        'height': map_model.height,
-                        'spawn_points': map_model.spawn_points,
-                        'minerals': map_model.minerals,
-                    }
-                except Map.DoesNotExist:
-                    pass
-            
-            # Execute scenario
+            # Execute scenario directly (scenarios now include all needed data)
             from matches.scenario import execute_scenario
-            replay_data = execute_scenario(scenario_data, map_data)
+            replay_data = execute_scenario(scenario_data)
             
             return JsonResponse({'status': 'ok', 'replay': replay_data})
         except yaml.YAMLError as e:

@@ -1,12 +1,10 @@
 """
 Scenario loader and executor.
-Loads YAML scenarios and executes them using the MatchSimulator.
+Loads YAML scenarios/maps and executes them using the MatchSimulator.
 """
-import os
 import yaml
 from pathlib import Path
 from matches.engine import MatchSimulator, Entity, Map as EngineMap
-from matches.models import Map as MapModel
 from matches.actions import MoveAction, AttackAction, GatherAction, HoldAction
 from matches.utils import Vector2D
 
@@ -47,23 +45,8 @@ def list_scenarios():
     return scenarios
 
 
-def load_map_from_db(map_name):
-    """Load map configuration from database by name."""
-    try:
-        map_model = MapModel.objects.get(name__iexact=map_name)
-        return {
-            'name': map_model.name,
-            'width': map_model.width,
-            'height': map_model.height,
-            'spawn_points': map_model.spawn_points,
-            'minerals': map_model.minerals,
-        }
-    except MapModel.DoesNotExist:
-        return None
-
-
 def create_engine_map_from_config(map_config):
-    """Create an Engine Map from map configuration dict."""
+    """Create an Engine Map from map/scenario configuration dict."""
     spawn_points = {}
     for key, value in map_config.get('spawn_points', {}).items():
         if isinstance(value, dict):
@@ -76,7 +59,7 @@ def create_engine_map_from_config(map_config):
         width=map_config.get('width', 128),
         height=map_config.get('height', 128),
         spawn_points=spawn_points,
-        minerals=map_config.get('minerals', []),
+        minerals=[],  # Minerals now come from entities
     )
 
 
@@ -97,25 +80,20 @@ def create_action(action_config):
     return None
 
 
-def execute_scenario(scenario_data, map_data=None):
+def execute_scenario(scenario_data):
     """
     Execute a scenario and return the replay history.
     
     Args:
-        scenario_data: Dict with scenario configuration
-        map_data: Optional map config from DB (if base_map specified)
+        scenario_data: Dict with scenario/map configuration
     
     Returns:
         List of tick deltas (replay history)
     """
-    # Get map config
-    if map_data:
-        engine_map = create_engine_map_from_config(map_data)
-    else:
-        # Default map if no base_map specified
-        engine_map = EngineMap()
+    # Create EngineMap from config
+    engine_map = create_engine_map_from_config(scenario_data)
     
-    # Create simulator without players (we'll create entities manually)
+    # Create simulator without players
     class DummyPlayer:
         def __init__(self, id):
             self.id = id
@@ -128,68 +106,40 @@ def execute_scenario(scenario_data, map_data=None):
         max_ticks=scenario_data.get('config', {}).get('max_ticks', 100)
     )
     
-    # Disable AI controllers (no auto-production)
+    # Disable AI controllers for scenarios
     sim.ai_controllers = []
     
-    # Don't setup initial entities (bases, workers) - we define our own
-    # Clear the entities that were created by _setup_initial_entities
+    # Clear entities - we'll create from config
     sim.entities = {}
-    
-    # Create entities from scenario
     entities_by_id = {}
     
-    # First: Create mineral patches from base map
-    for mineral in engine_map.minerals:
-        entity = Entity(
-            unit_type='mineral_patch',
-            owner_id='neutral',
-            x=mineral.get('x', 0),
-            y=mineral.get('y', 0),
-        )
-        # Center it: (x, y) is top-left
-        entity.pos.x += entity.width / 2.0
-        entity.pos.y += entity.height / 2.0
-        entities_by_id[entity.id] = entity
-        sim.entities[entity.id] = entity
-        
-        # Add to nav grid
-        bx, by = int(entity.pos.x - entity.width/2), int(entity.pos.y - entity.height/2)
-        for ox in range(entity.width):
-            for oy in range(entity.height):
-                sim.nav_grid.set_static(bx + ox, by + oy, entity.id)
+    # Get entities from config
+    entities_config = scenario_data.get('entities', [])
     
-    # Second: Create extra minerals from scenario
-    for entity_config in scenario_data.get('entities', []):
-        if 'extra_minerals' in entity_config:
-            for mineral in entity_config['extra_minerals']:
-                entity = Entity(
-                    unit_type='mineral_patch',
-                    owner_id='neutral',
-                    x=mineral.get('x', 0),
-                    y=mineral.get('y', 0),
-                )
-                entity.pos.x += entity.width / 2.0
-                entity.pos.y += entity.height / 2.0
-                entities_by_id[entity.id] = entity
-                sim.entities[entity.id] = entity
-                
-                bx, by = int(entity.pos.x - entity.width/2), int(entity.pos.y - entity.height/2)
-                for ox in range(entity.width):
-                    for oy in range(entity.height):
-                        sim.nav_grid.set_static(bx + ox, by + oy, entity.id)
-    
-    # Third: Create other entities from scenario (workers, units, etc)
-    for entity_config in scenario_data.get('entities', []):
+    # Create all entities from config
+    for entity_config in entities_config:
         if 'type' not in entity_config:
             continue
         
         entity = Entity(
             unit_type=entity_config['type'],
-            owner_id=entity_config['owner'],
-            x=entity_config['x'],
-            y=entity_config['y'],
+            owner_id=entity_config.get('owner', 'neutral'),
+            x=entity_config.get('x', 0),
+            y=entity_config.get('y', 0),
             entity_id=entity_config.get('id')
         )
+        
+        # Center minerals (they are placed at top-left)
+        if entity.type == 'mineral_patch':
+            entity.pos.x += entity.width / 2.0
+            entity.pos.y += entity.height / 2.0
+            
+            # Add to nav grid
+            bx, by = int(entity.pos.x - entity.width/2), int(entity.pos.y - entity.height/2)
+            for ox in range(entity.width):
+                for oy in range(entity.height):
+                    sim.nav_grid.set_static(bx + ox, by + oy, entity.id)
+        
         entities_by_id[entity.id] = entity
         sim.entities[entity.id] = entity
     
@@ -290,10 +240,4 @@ def execute_scenario(scenario_data, map_data=None):
 def run_scenario_from_file(yaml_path):
     """Load and execute a scenario from a YAML file path."""
     scenario_data = load_scenario_yaml(yaml_path)
-    
-    # Get base map from DB if specified
-    map_data = None
-    if 'base_map' in scenario_data:
-        map_data = load_map_from_db(scenario_data['base_map'])
-    
-    return execute_scenario(scenario_data, map_data)
+    return execute_scenario(scenario_data)

@@ -41,10 +41,12 @@ Ver `docs/match-engine.md` para detalles técnicos.
 
 ```
 shakuras-api/          # Proyecto Django (API REST)
+  scenarios/           # Archivos YAML de escenarios de prueba
+  src/matches/        # Match engine + API
 shakuras-engine/       # Paquete Python independiente (futuro)
 ```
 
-El match engine debería ser un paquete Python independiente, sin dependencias de Django, para facilitar testing y reuse.
+El match engine podría ser un paquete Python independiente, sin dependencias de Django, para facilitar testing y reuse. Por ahora está integrado en `src/matches/`.
 
 ## Estado Actual
 
@@ -52,11 +54,20 @@ El match engine debería ser un paquete Python independiente, sin dependencias d
 - Modelo de Player con stats: macro, micro, multitasking, strategy
 - Modelo de Team
 - Match engine con física, acciones y replay
+- Sistema de escenarios YAML para testing del engine
 
 ### Por Hacer
 - Lógica de mejoras de bots tras partidos
 - Sistema de mercado de fichajes
 - Sistema de tácticas/estrategias configurables
+- IA básica funcional para los bots
 - Integración con el match engine
 - Torneos y ligas
 - Sistema de fatiga, lesiones, condición física
+
+### Próximos pasos del Match Engine
+1. Agregar unidad Medic
+2. Implementar IA básica funcional
+3. Sistema de rendición automática
+4. Lógica de victoria/derrota
+5. Guardar replay completo en DB
