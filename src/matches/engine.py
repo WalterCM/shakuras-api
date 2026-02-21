@@ -8,7 +8,7 @@ from .actions import GatherAction, AttackAction, MoveAction, HoldAction
 
 class Map:
     """Stores static map data: dimensions, spawns, and terrain."""
-    def __init__(self, name="Default", width=128, height=128, spawn_points=None):
+    def __init__(self, name="Default", width=128, height=128, spawn_points=None, minerals=None):
         self.name = name
         self.width = width
         self.height = height
@@ -17,6 +17,8 @@ class Map:
             'p1': Vector2D(10, 10),
             'p2': Vector2D(width - 10, height - 10)
         }
+        # List of {x, y} for mineral patches
+        self.minerals = minerals or []
         # Placeholder for terrain (0 = walkable, 1 = obstacle)
         self.terrain = [[0 for _ in range(width)] for _ in range(height)]
 

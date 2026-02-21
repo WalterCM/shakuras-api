@@ -1,0 +1,66 @@
+# Test: Wall with gap at center (y=15)
+# Wall at x=30, y=5-25, with gap at y=15
+
+name: "Wall 1 gap center"
+description: "Worker trying to cross mineral wall with 1 gap at center"
+
+base_map: bloodbath
+
+entities:
+  - id: worker1
+    type: worker
+    owner: p1
+    x: 10
+    y: 15
+
+    extra_minerals:
+      # Wall below gap (y=5 to y=14)
+      - x: 30
+        y: 5
+      - x: 30
+        y: 6
+      - x: 30
+        y: 7
+      - x: 30
+        y: 8
+      - x: 30
+        y: 9
+      - x: 30
+        y: 10
+      - x: 30
+        y: 11
+      - x: 30
+        y: 12
+      - x: 30
+        y: 13
+      - x: 30
+        y: 14
+      # Wall above gap (y=16 to y=25)
+      - x: 30
+        y: 16
+      - x: 30
+        y: 17
+      - x: 30
+        y: 18
+      - x: 30
+        y: 19
+      - x: 30
+        y: 20
+      - x: 30
+        y: 21
+      - x: 30
+        y: 22
+      - x: 30
+        y: 23
+      - x: 30
+        y: 24
+
+triggers:
+  - tick: 0
+    entity: worker1
+    action:
+      type: move
+      target: {x: 50, y: 15}
+
+config:
+  max_ticks: 100

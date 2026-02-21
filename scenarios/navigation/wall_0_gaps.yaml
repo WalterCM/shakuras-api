@@ -1,0 +1,56 @@
+# Test: Solid wall - unit should slide around it.
+# Wall at x=30, blocking y=5 to y=20
+
+name: "Wall 0 gaps"
+description: "Worker trying to cross solid mineral wall with no gaps"
+
+base_map: bloodbath
+
+entities:
+  - id: worker1
+    type: worker
+    owner: p1
+    x: 10
+    y: 15
+
+    extra_minerals:
+      - x: 30
+        y: 5
+      - x: 30
+        y: 6
+      - x: 30
+        y: 7
+      - x: 30
+        y: 8
+      - x: 30
+        y: 9
+      - x: 30
+        y: 10
+      - x: 30
+        y: 11
+      - x: 30
+        y: 12
+      - x: 30
+        y: 13
+      - x: 30
+        y: 14
+      - x: 30
+        y: 15
+      - x: 30
+        y: 16
+      - x: 30
+        y: 17
+      - x: 30
+        y: 18
+      - x: 30
+        y: 19
+
+triggers:
+  - tick: 0
+    entity: worker1
+    action:
+      type: move
+      target: {x: 50, y: 15}
+
+config:
+  max_ticks: 100

@@ -1,0 +1,68 @@
+# Test: L-shaped wall with escape path
+# L-shape: vertical wall at x=30, y=10-25, horizontal wall at y=20, x=20-29
+
+name: "L-shape corner"
+description: "Worker navigating L-shaped wall with escape path"
+
+base_map: bloodbath
+
+entities:
+  - id: worker1
+    type: worker
+    owner: p1
+    x: 25
+    y: 15
+
+    extra_minerals:
+      # Vertical wall (x=30, y=10-20)
+      - x: 30
+        y: 10
+      - x: 30
+        y: 11
+      - x: 30
+        y: 12
+      - x: 30
+        y: 13
+      - x: 30
+        y: 14
+      - x: 30
+        y: 15
+      - x: 30
+        y: 16
+      - x: 30
+        y: 17
+      - x: 30
+        y: 18
+      - x: 30
+        y: 19
+      # Horizontal wall (x=20-29, y=20)
+      - x: 20
+        y: 20
+      - x: 21
+        y: 20
+      - x: 22
+        y: 20
+      - x: 23
+        y: 20
+      - x: 24
+        y: 20
+      - x: 25
+        y: 20
+      - x: 26
+        y: 20
+      - x: 27
+        y: 20
+      - x: 28
+        y: 20
+      - x: 29
+        y: 20
+
+triggers:
+  - tick: 0
+    entity: worker1
+    action:
+      type: move
+      target: {x: 50, y: 25}
+
+config:
+  max_ticks: 100
