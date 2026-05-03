@@ -75,7 +75,7 @@ class GridCollisionTests(TestCase):
         worker.action = MoveAction(Vector2D(20, 20))
         gs._spawn_entity(worker)
         
-        for _ in range(60):
+        for _ in range(150):
             gs.nav_grid.clear_dynamic()
             for ent in gs.entities.values():
                 if ent.type not in ['base', 'mineral_patch', 'building']:

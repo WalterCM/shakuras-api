@@ -11,63 +11,84 @@ Shakuras es un juego de manager de eSports inspirado en Football Manager, donde 
 - **Jugador humano**: Manager/Coach, no controla unidades durante los matches
 - **Objetivo**: Gestionar equipo, tácticas, estrategias, y ganar torneos/ligas
 
-## Elementos del Juego
+## Diseño del Juego
 
 ### Equipos y Jugadores (Bots)
 
 - Los equipos están formados por bots ("jugadores")
 - Cada bot tiene stats individuales: macro, micro, multitasking, strategy
 - Los bots tienen raza (Terran, Zerg, Protoss, Random)
-- Los bots pueden mejorar tras los partidos
-- Sistema de mercado de fichajes entre equipos
+- Ideas futuras: mejoras tras partidos, mercado de fichajes, fatiga/lesiones
 
-### Carreras/Razas Soportadas
-
-1. **Terran**: SCV, Marine, Medic (MVP inicial: Terran vs Terran)
-2. **Protoss**: Probe, Zealot, Dragoon
-3. **Zerg**: Drone, Zergling, Hydralisk, Mutalisk
-
-### Tácticas y Estrategias
+### Tácticas y Estrategias (por implementar)
 
 - Estrategias predefinidas y configurables por el usuario
 - Cada estrategia es un conjunto de reglas que afecta el comportamiento del bot
 - El manager decide qué jugadores (bots) se adaptan mejor a cada estrategia
 
+## Arquitectura del Proyecto
+
+```
+shakuras-api/
+├── maps/                    # Mapas YAML (layouts de juego)
+├── scenarios/               # Escenarios YAML para testing del engine
+│   └── navigation/          # Escenarios de pathfinding
+├── docs/                    # Documentación
+├── src/
+│   ├── shakuras/            # Configuración Django (settings, urls)
+│   ├── matches/             # Match engine + API + visualizadores
+│   ├── players/             # Jugadores (bots) con stats y razas
+│   ├── teams/               # Equipos
+│   └── users/               # Usuarios (managers humanos)
+└── requirements.txt
+```
+
 ## Match Engine
 
 Ver `docs/match-engine.md` para detalles técnicos.
 
-## Arquitectura Propuesta
-
-```
-shakuras-api/          # Proyecto Django (API REST)
-  scenarios/           # Archivos YAML de escenarios de prueba
-  src/matches/        # Match engine + API
-shakuras-engine/       # Paquete Python independiente (futuro)
-```
-
-El match engine podría ser un paquete Python independiente, sin dependencias de Django, para facilitar testing y reuse. Por ahora está integrado en `src/matches/`.
-
 ## Estado Actual
 
 ### Implementado
-- Modelo de Player con stats: macro, micro, multitasking, strategy
-- Modelo de Team
-- Match engine con física, acciones y replay
-- Sistema de escenarios YAML para testing del engine
 
-### Por Hacer
-- Lógica de mejoras de bots tras partidos
-- Sistema de mercado de fichajes
-- Sistema de tácticas/estrategias configurables
-- IA básica funcional para los bots
-- Integración con el match engine
+**Match Engine (`matches/`)**
+- Motor de simulación tick-by-tick con física, colisiones y pathfinding
+- 4 acciones de unidades: Gather, Attack, Move, Hold
+- 6 tipos de entidad: base, worker, marine, zealot, zergling, mineral_patch
+- Sistema de producción de unidades (cola en buildings)
+- IA de producción automática (`ProductionAI`): produce workers y reasigna idle
+- Resource contention: un worker por mineral patch a la vez
+- Sistema de replay basado en deltas JSON
+- Sistema de mapas YAML con loader y validación (`loader.py`)
+- Sistema de escenarios YAML para testing sin base de datos (`scenario.py`)
+- Modelo `Replay` para guardar replays en DB
+
+**Herramientas visuales**
+- Visualizador de replays (HTML)
+- Visualizador de escenarios (HTML)
+- Editor de mapas interactivo (HTML)
+
+**Jugadores y equipos (`players/`, `teams/`)**
+- Modelo `Player` con stats: macro, micro, multitasking, strategy (0-100)
+- Raza por jugador: Terran, Zerg, Protoss, Random
+- Generador de jugadores con nombres realistas (Faker + hangul-names para nombres coreanos)
+- Modelo `Team` básico
+
+**Usuarios y API (`users/`, `shakuras/`)**
+- Custom User model basado en email
+- Autenticación JWT (SimpleJWT)
+- API REST con Django REST Framework
+
+**Testing**
+- 58 tests unitarios (pytest + pytest-django)
+- Cobertura: navegación, combate, minería, colisiones, producción, API, editor de mapas
+
+### Por implementar
+
+- Asociación de unidades a razas en el engine (hoy un jugador Terran puede producir zealots)
+- IA funcional para los bots (la actual solo produce workers)
+- Lógica de victoria/derrota
+- Tácticas y estrategias configurables
 - Torneos y ligas
-- Sistema de fatiga, lesiones, condición física
-
-### Próximos pasos del Match Engine
-1. Agregar unidad Medic
-2. Implementar IA básica funcional
-3. Sistema de rendición automática
-4. Lógica de victoria/derrota
-5. Guardar replay completo en DB
+- Mejoras de bots tras partidos
+- Mercado de fichajes

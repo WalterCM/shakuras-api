@@ -225,15 +225,25 @@ class Entity:
 
         direction = diff.normalize()
         
-        # Probe ahead (at least speed distance)
+        # Probe ahead incrementally to prevent jumping over thin walls
         probe_dist = max(1.0, self.speed)
-        probe_pos = self.pos + direction * probe_dist
-        
         from .actions import GatherAction
         am_gathering = isinstance(self.action, GatherAction)
         
-        # Check Layer A (Static) and Layer B (Dynamic - if not gathering)
-        is_blocked = game_state.nav_grid.is_blocked(probe_pos, check_dynamic=not am_gathering, entity=self)
+        is_blocked = False
+        step = 0.5
+        d = step
+        while d <= probe_dist:
+            check_pos = self.pos + direction * d
+            if game_state.nav_grid.is_blocked(check_pos, check_dynamic=not am_gathering, entity=self):
+                is_blocked = True
+                break
+            d += step
+            
+        if not is_blocked:
+            probe_pos = self.pos + direction * probe_dist
+            if game_state.nav_grid.is_blocked(probe_pos, check_dynamic=not am_gathering, entity=self):
+                is_blocked = True
         
         # If we're currently sliding, check if we've cleared the obstacle
         if self.slide_direction is not None:
@@ -243,37 +253,9 @@ class Entity:
                 move_dist = min(self.speed, dist)
                 self.pos += direction * move_dist
             else:
-                # Still blocked, try gap detection first
-                gap_pos = self.find_gap(target_pos, game_state)
-                if gap_pos is not None:
-                    # Head toward the gap
-                    gap_dir = gap_pos - self.pos
-                    if gap_dir.length() > 0.1:
-                        move_dir = gap_dir.normalize()
-                        move_dist = min(self.speed, gap_dir.length())
-                        # Verify the move is safe
-                        test_pos = self.pos + move_dir * move_dist
-                        if not game_state.nav_grid.is_blocked(test_pos, check_dynamic=not am_gathering, entity=self):
-                            self.pos += move_dir * move_dist
-                            self.slide_direction = None
-                            return
-                # No gap or gap unreachable, keep sliding
                 self.slide_logic(target_pos, game_state)
         elif is_blocked:
-            # First time hitting obstacle, try gap detection first
-            gap_pos = self.find_gap(target_pos, game_state)
-            if gap_pos is not None:
-                # Head toward the gap
-                gap_dir = gap_pos - self.pos
-                if gap_dir.length() > 0.1:
-                    move_dir = gap_dir.normalize()
-                    move_dist = min(self.speed, gap_dir.length())
-                    # Verify the move is safe
-                    test_pos = self.pos + move_dir * move_dist
-                    if not game_state.nav_grid.is_blocked(test_pos, check_dynamic=not am_gathering, entity=self):
-                        self.pos += move_dir * move_dist
-                        return
-            # No gap found, enter slide mode
+            # First time hitting obstacle, enter slide mode
             self.slide_logic(target_pos, game_state)
         else:
             # No obstacle, move directly
@@ -281,189 +263,100 @@ class Entity:
             move_dist = min(self.speed, dist)
             self.pos += direction * move_dist
 
-    def find_gap(self, target_pos, game_state):
-        """Find first opening (gap) in the obstacle in direction of target.
-        Looks for navigable tiles that come right after blocked tiles."""
-        from .actions import GatherAction
-        am_gathering = isinstance(self.action, GatherAction)
-        
-        # 1. Buscar en rayo directo hacia el objetivo
-        gap = self._scan_ray(target_pos, game_state, am_gathering)
-        if gap:
-            return gap
-        
-        # 2. Buscar gaps horizontales: tiles navegables que están después de tiles bloqueados
-        # Buscar hacia la derecha
-        for dx in range(1, 15):
-            for dy in range(-10, 11):
-                check_pos = Vector2D(self.pos.x + dx, self.pos.y + dy)
-                
-                # Este tile debe ser navegable
-                if game_state.nav_grid.is_blocked(check_pos, check_dynamic=not am_gathering, entity=self):
-                    continue
-                
-                # El tile inmediatamente a la izquierda debe ser BLOQUEADO
-                prev_pos = Vector2D(self.pos.x + dx - 1, self.pos.y + dy)
-                if not game_state.nav_grid.is_blocked(prev_pos, check_dynamic=not am_gathering, entity=self):
-                    continue
-                
-                # Este es un gap horizontal! Verificar que acerca al objetivo
-                if check_pos.dist_to(target_pos) < self.pos.dist_to(target_pos):
-                    return check_pos
-        
-        # Buscar hacia la izquierda
-        for dx in range(1, 15):
-            for dy in range(-10, 11):
-                check_pos = Vector2D(self.pos.x - dx, self.pos.y + dy)
-                
-                if game_state.nav_grid.is_blocked(check_pos, check_dynamic=not am_gathering, entity=self):
-                    continue
-                
-                prev_pos = Vector2D(self.pos.x - dx + 1, self.pos.y + dy)
-                if not game_state.nav_grid.is_blocked(prev_pos, check_dynamic=not am_gathering, entity=self):
-                    continue
-                
-                if check_pos.dist_to(target_pos) < self.pos.dist_to(target_pos):
-                    return check_pos
-        
-        # Buscar gaps verticales
-        # Buscar hacia abajo
-        for dy in range(1, 15):
-            for dx in range(-10, 11):
-                check_pos = Vector2D(self.pos.x + dx, self.pos.y + dy)
-                
-                if game_state.nav_grid.is_blocked(check_pos, check_dynamic=not am_gathering, entity=self):
-                    continue
-                
-                prev_pos = Vector2D(self.pos.x + dx, self.pos.y + dy - 1)
-                if not game_state.nav_grid.is_blocked(prev_pos, check_dynamic=not am_gathering, entity=self):
-                    continue
-                
-                if check_pos.dist_to(target_pos) < self.pos.dist_to(target_pos):
-                    return check_pos
-        
-        # Buscar hacia arriba
-        for dy in range(1, 15):
-            for dx in range(-10, 11):
-                check_pos = Vector2D(self.pos.x + dx, self.pos.y - dy)
-                
-                if game_state.nav_grid.is_blocked(check_pos, check_dynamic=not am_gathering, entity=self):
-                    continue
-                
-                prev_pos = Vector2D(self.pos.x + dx, self.pos.y - dy + 1)
-                if not game_state.nav_grid.is_blocked(prev_pos, check_dynamic=not am_gathering, entity=self):
-                    continue
-                
-                if check_pos.dist_to(target_pos) < self.pos.dist_to(target_pos):
-                    return check_pos
-        
-        return None
-
-    def _scan_ray(self, target_pos, game_state, am_gathering):
-        """Escanea desde posición actual hacia objetivo, retorna primer gap."""
-        direction = (target_pos - self.pos).normalize()
-        
-        for dist in range(1, 15):
-            check_pos = self.pos + direction * dist
-            
-            if not game_state.nav_grid.is_blocked(check_pos, check_dynamic=not am_gathering, entity=self):
-                return check_pos
-        
-        return None
-
-    def _scan_ray(self, target_pos, game_state, am_gathering):
-        """Escanea desde posición actual hacia objetivo, retorna primer gap."""
-        direction = (target_pos - self.pos).normalize()
-        
-        for dist in range(1, 11):  # hasta 10 tiles ahead
-            check_pos = self.pos + direction * dist
-            
-            if not game_state.nav_grid.is_blocked(check_pos, check_dynamic=not am_gathering, entity=self):
-                return check_pos
-        
-        return None
 
 
     def slide_logic(self, target_pos, game_state):
-        """Finds a tangent path around an obstacle and sticks to it."""
+        """Finds a tangent path around an obstacle and sticks to it.
+        Uses a fan-sweep algorithm to smoothly follow walls and dive into gaps."""
+        import math
+        from .utils import Vector2D
         from .actions import GatherAction
         am_gathering = isinstance(self.action, GatherAction)
         
-        # Get original direction
         orig_diff = target_pos - self.pos
         orig_dir = orig_diff.normalize()
         
-        # Try both tangents: Left and Right (90 degrees)
-        tangent_left = Vector2D(-orig_dir.y, orig_dir.x)
-        tangent_right = Vector2D(orig_dir.y, -orig_dir.x)
-        
-        def get_clearance(test_dir):
-            """Measures how many units we can move in a direction before hitting something."""
-            for step in range(1, 6): # Probe up to 5 units
-                p = self.pos + test_dir * step
+        def get_clearance(test_dir, max_d=1.8):
+            step = 0.5
+            d = step
+            last_safe = 0
+            while d <= max_d:
+                p = self.pos + test_dir * d
                 if game_state.nav_grid.is_blocked(p, check_dynamic=not am_gathering, entity=self):
-                    return step - 1
-            return 10 # Path is relatively clear
-            
-        left_clear = get_clearance(tangent_left)
-        right_clear = get_clearance(tangent_right)
+                    break
+                last_safe = d
+                d += step
+            return last_safe
 
-        # Per-Tick Recovery: Stick to the chosen side but verify every tick.
-        # Switch only if the other side becomes significantly (>50%) better to prevent jitter.
+        # If no direction chosen, pick the one with the best immediate opening
         if self.slide_direction is None:
-            # First time hitting wall: Choose a side
-            if left_clear == right_clear:
-                # Tie-breaker: Choose the side that's more aligned with reaching the goal
-                # Use dot product: higher value means more aligned
-                # Since tangents are perpendicular to goal direction, we check which one
-                # doesn't take us away from the goal
-                left_dot = tangent_left.x * orig_dir.x + tangent_left.y * orig_dir.y
-                right_dot = tangent_right.x * orig_dir.x + tangent_right.y * orig_dir.y
-                
-                # Choose the tangent with the higher (less negative) dot product
-                # This picks the direction that's less perpendicular to the goal
-                self.slide_direction = 'left' if left_dot >= right_dot else 'right'
-            else:
-                self.slide_direction = 'left' if left_clear >= right_clear else 'right'
-        else:
-            if self.slide_direction == 'left' and right_clear > left_clear * 1.5 and right_clear > 2:
-                self.slide_direction = 'right'
-            elif self.slide_direction == 'right' and left_clear > right_clear * 1.5 and left_clear > 2:
-                self.slide_direction = 'left'
-        
-        # Move in chosen direction
-        chosen_dir = tangent_left if self.slide_direction == 'left' else tangent_right
-        
-        # The Arc Cheat (Contour Following / Wall Hugging) / Rotation to find opening
-        if game_state.nav_grid.is_blocked(self.pos + chosen_dir * 0.5, check_dynamic=not am_gathering, entity=self):
-            found_path = False
-            for angle_deg in [45, 135, 180]:
-                rad = math.radians(angle_deg if self.slide_direction == 'left' else -angle_deg)
+            best_left_clear = -1
+            best_left_angle = 180
+            for angle in range(0, 181, 15):
+                rad = math.radians(angle)
                 test_dir = Vector2D(
                     orig_dir.x * math.cos(rad) - orig_dir.y * math.sin(rad),
                     orig_dir.x * math.sin(rad) + orig_dir.y * math.cos(rad)
                 )
-                if not game_state.nav_grid.is_blocked(self.pos + test_dir * 0.5, check_dynamic=not am_gathering, entity=self):
-                    chosen_dir = test_dir
-                    found_path = True
-                    break
-            
-            if not found_path:
-                self.slide_direction = 'right' if self.slide_direction == 'left' else 'left'
-                chosen_dir = tangent_left if self.slide_direction == 'left' else tangent_right
+                c = get_clearance(test_dir)
+                if c > best_left_clear:
+                    best_left_clear = c
+                    best_left_angle = angle
+                    
+            best_right_clear = -1
+            best_right_angle = 180
+            for angle in range(0, 181, 15):
+                rad = math.radians(-angle)
+                test_dir = Vector2D(
+                    orig_dir.x * math.cos(rad) - orig_dir.y * math.sin(rad),
+                    orig_dir.x * math.sin(rad) + orig_dir.y * math.cos(rad)
+                )
+                c = get_clearance(test_dir)
+                if c > best_right_clear:
+                    best_right_clear = c
+                    best_right_angle = angle
+                    
+            if best_left_clear > best_right_clear:
+                self.slide_direction = 'left'
+            elif best_right_clear > best_left_clear:
+                self.slide_direction = 'right'
+            elif best_left_angle <= best_right_angle:
+                self.slide_direction = 'left'
+            else:
+                self.slide_direction = 'right'
 
-        # Move along the wall - carefully probe to avoid jumping into walls
-        move_dist = self.speed
-        step = 0.1
-        safe_dist = 0
-        for d in range(1, int(move_dist / step) + 1):
-            test_pos = self.pos + chosen_dir * (d * step)
-            if game_state.nav_grid.is_blocked(test_pos, check_dynamic=not am_gathering, entity=self):
-                break
-            safe_dist = d * step
+        # Now sweep in the chosen direction
+        angles_to_test = range(0, 181, 15)
+        
+        best_dir = None
+        best_clearance = -1
+        best_angle = 180
+        
+        for angle in angles_to_test:
+            rad = math.radians(angle if self.slide_direction == 'left' else -angle)
+            test_dir = Vector2D(
+                orig_dir.x * math.cos(rad) - orig_dir.y * math.sin(rad),
+                orig_dir.x * math.sin(rad) + orig_dir.y * math.cos(rad)
+            )
+            c = get_clearance(test_dir)
+            if c > best_clearance:
+                best_clearance = c
+                best_dir = test_dir
+                best_angle = angle
+                
+        if best_clearance <= 0:
+            # Completely blocked this way, switch!
+            self.slide_direction = 'right' if self.slide_direction == 'left' else 'left'
+            return # Move next tick
             
-        if safe_dist > 0:
-            self.pos += chosen_dir * safe_dist
+        move_dist = min(self.speed, orig_diff.length())
+            
+        if best_angle == 0 and best_clearance >= move_dist:
+            self.slide_direction = None # We are clear!
+            
+        # Move
+        move_dist = min(move_dist, best_clearance)
+        self.pos += best_dir * move_dist
 
     def update(self, game_state):
         """Update entity state based on current logic"""
@@ -505,17 +398,15 @@ class Entity:
             if not other or other.status == 'dead':
                 continue
             
-            # WORKER GHOSTING: 
-            # Workers assigned to minerals ignore collision with buildings 
-            # and other gathering workers to prevent gridlocks.
-            if am_gathering:
-                if other.type in ['base', 'mineral_patch']:
-                    continue
-                if other.type == 'worker' and isinstance(other.action, GatherAction):
-                    continue
+            # Static structures are handled perfectly by the NavGrid logic.
+            # Repelling units from static structures causes erratic behavior in concave corners
+            # because the multiple radial overlaps squeeze the unit and force it through walls.
+            if other.type in ['base', 'mineral_patch', 'building']:
+                continue
                 
-            # If both are buildings, they don't push each other
-            if self.type in ['base', 'mineral_patch'] and other.type in ['base', 'mineral_patch']:
+            # WORKER GHOSTING: 
+            # Workers assigned to minerals ignore collision with other gathering workers to prevent gridlocks.
+            if am_gathering and other.type == 'worker' and isinstance(other.action, GatherAction):
                 continue
 
             diff = self.pos - other.pos
@@ -523,8 +414,8 @@ class Entity:
             min_dist = my_radius + other.radius
             
             if dist_sq < min_dist**2:
-                # Push factor (softness)
-                push_factor = 0.8 if other.type in ['base', 'mineral_patch', 'building'] else 0.2
+                # Normal unit vs unit repulsion (share the push)
+                push_factor = 0.2
                 
                 if dist_sq > 0.001:
                     dist = math.sqrt(dist_sq)
@@ -551,7 +442,7 @@ class Entity:
             # We use a slight offset of 1.0 beyond the radius
             spawn_dist = self.radius + stats.get('radius', 1.0) + 1.0
             new_unit = Entity(unit_type, self.owner_id, self.pos.x, self.pos.y + spawn_dist)
-            game_state._spawn_entity(new_unit)
+            game_state.add_entity(new_unit)
             
             # Clean up queue
             self.production_queue.pop(0)
@@ -612,6 +503,7 @@ class MatchSimulator:
             ProductionAI(self.player1_id),
             ProductionAI(self.player2_id)
         ]
+        self.triggers = {}  # tick -> list of {'entity_id': str, 'action': Action}
 
     def add_minerals(self, player_id, amount):
         if player_id in self.resources:
@@ -640,7 +532,7 @@ class MatchSimulator:
             
         return False
 
-    def _spawn_entity(self, entity):
+    def add_entity(self, entity):
         self.entities[entity.id] = entity
         
         # Update Nav Grid for buildings/minerals
@@ -668,7 +560,7 @@ class MatchSimulator:
                 closest = min(enemies, key=lambda e: entity.pos.dist_to_sq(e.pos))
                 entity.action = AttackAction(closest.id)
 
-    def _setup_initial_entities(self):
+    def setup_match(self):
         # 1. Minerals FIRST from Map data so workers can find them
         for m in self.map_data.minerals:
             # Support both dict {x, y} and Vector2D
@@ -680,7 +572,7 @@ class MatchSimulator:
             # Center it: (x, y) from editor is top-left
             patch.pos.x += patch.width / 2.0
             patch.pos.y += patch.height / 2.0
-            self._spawn_entity(patch)
+            self.add_entity(patch)
 
         # 2. Spawns (Bases)
         spawns = self.map_data.spawn_points
@@ -694,7 +586,7 @@ class MatchSimulator:
             # Center it: (x, y) from editor is top-left
             base.pos.x += base.width / 2.0
             base.pos.y += base.height / 2.0
-            self._spawn_entity(base)
+            self.add_entity(base)
             
             # 3. Initial workers near base (spawned AFTER minerals)
             # Spawn them in a row below the base
@@ -702,15 +594,17 @@ class MatchSimulator:
             offsets = [(-1.5, 2.5), (-0.5, 2.5), (0.5, 2.5), (1.5, 2.5)] 
             for i in range(4):
                 ox, oy = offsets[i]
-                self._spawn_entity(Entity('worker', pid, bx + ox, by + oy))
+                self.add_entity(Entity('worker', pid, bx + ox, by + oy))
 
-    def _add_entity(self, entity):
-        self.entities[entity.id] = entity
+
 
     def simulate(self):
-        """Runs the simulation and returns delta-based JSON history"""
-        self._setup_initial_entities()
+        """Runs the simulation and returns delta-based JSON history.
         
+        Entities must be set up before calling this method.
+        For a normal match, call setup_match() first.
+        For scenarios, add entities manually and configure triggers.
+        """
         # Initial State (Tick 0)
         initial_state = [e.to_dict(self) for e in self.entities.values()]
         self.history.append({
@@ -720,11 +614,23 @@ class MatchSimulator:
             'resources': self.resources.copy()
         })
 
-        for tick in range(1, self.max_ticks):
-            # 1. Update Controllers
+        # Execute triggers at tick 0 (before the main loop)
+        for trigger in self.triggers.get(0, []):
+            entity = self.entities.get(trigger['entity_id'])
+            if entity:
+                entity.action = trigger['action']
+
+        for tick in range(1, self.max_ticks + 1):
+            # 1. Execute triggers for this tick
+            for trigger in self.triggers.get(tick, []):
+                entity = self.entities.get(trigger['entity_id'])
+                if entity:
+                    entity.action = trigger['action']
+
+            # 2. Update Controllers
             for ai in self.ai_controllers:
                 ai.update(self)
-            # 2. Prepare Spatial Search & Nav Grid
+            # 3. Prepare Spatial Search & Nav Grid
             self.grid.clear()
             self.nav_grid.clear_dynamic()
             for ent in self.entities.values():
@@ -737,16 +643,16 @@ class MatchSimulator:
             # (In a real engine we'd do this on death, but here we can refresh if needed)
             # Actually minerals don't move, so we only need to clear if they die.
             
-            # 3. Capture Snapshots for delta calculation
+            # 4. Capture Snapshots for delta calculation
             pre_update_snapshots = {eid: ent.to_dict(self) for eid, ent in self.entities.items()}
             old_resources = self.resources.copy()
             old_entity_ids = set(self.entities.keys())
 
-            # 4. Physics/Behavior Update
+            # 5. Physics/Behavior Update
             for ent in list(self.entities.values()):
                 ent.update(self)
 
-            # 5. Record Deltas
+            # 6. Record Deltas
             tick_deltas = []
             for ent_id, ent in self.entities.items():
                 if ent_id not in old_entity_ids:

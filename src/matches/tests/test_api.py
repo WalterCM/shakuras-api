@@ -176,6 +176,7 @@ class EngineCoreTests(TestCase):
         player2 = Player.objects.create(nickname='P2')
         
         sim = MatchSimulator(player1, player2, max_ticks=5)
+        sim.setup_match()
         history = sim.simulate()
         
         # Tick 0 should have full snapshots
@@ -260,7 +261,7 @@ class EngineCoreTests(TestCase):
         p1 = Player.objects.create(nickname='P1')
         p2 = Player.objects.create(nickname='P2')
         sim = MatchSimulator(p1, p2)
-        sim._setup_initial_entities()
+        sim.setup_match()
         
         sim.resources['p1'] = 100
         success = sim.request_unit('p1', 'marine')
@@ -277,7 +278,7 @@ class EngineCoreTests(TestCase):
         p1 = Player.objects.create(nickname='P1')
         p2 = Player.objects.create(nickname='P2')
         sim = MatchSimulator(p1, p2)
-        sim._setup_initial_entities() # Tick 0
+        sim.setup_match() # Tick 0
         
         sim.resources['p1'] = 50
         sim.request_unit('p1', 'marine') # Build time = 24

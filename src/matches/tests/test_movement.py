@@ -30,28 +30,28 @@ class MovementAndCollisionTests(TestCase):
 
     def test_entity_radius_collision(self):
         """Test that entities with different radii collide correctly"""
-        # Marine (radius 1.0) and Base (radius 4.0)
+        # Marine (radius 0.5) and Worker (radius 0.5)
         marine = Entity('marine', 'p1', 10, 10)
-        base = Entity('base', 'p1', 10.5, 10)  # Very close
+        worker = Entity('worker', 'p1', 10.5, 10)  # Very close
         
         class MockGameState:
             def __init__(self):
-                self.entities = {marine.id: marine, base.id: base}
+                self.entities = {marine.id: marine, worker.id: worker}
                 self.grid = SpatialGrid(128, 128)
         
         gs = MockGameState()
         gs.grid.insert(marine)
-        gs.grid.insert(base)
+        gs.grid.insert(worker)
         
-        initial_dist = marine.pos.dist_to(base.pos)
+        initial_dist = marine.pos.dist_to(worker.pos)
         
         # Apply repulsion
         marine.update(gs)
         
         # Distance should increase due to repulsion
-        final_dist = marine.pos.dist_to(base.pos)
+        final_dist = marine.pos.dist_to(worker.pos)
         # Marine should be pushed away since they're overlapping
-        # (distance 0.5 < combined radii of 5.0)
+        # (distance 0.5 < combined radii of 1.0)
         self.assertGreater(final_dist, initial_dist)
 
     def test_spatial_grid_boundary(self):

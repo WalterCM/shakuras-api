@@ -14,7 +14,7 @@ class ProductionEdgeCaseTests(TestCase):
         p1 = Player.objects.create(nickname='P1')
         p2 = Player.objects.create(nickname='P2')
         sim = MatchSimulator(p1, p2)
-        sim._setup_initial_entities()
+        sim.setup_match()
         
         # Give lots of minerals
         sim.resources['p1'] = 1000

@@ -60,6 +60,7 @@ class TestMapEditor:
         )
         
         sim = MatchSimulator(p1, p2, map_instance=engine_map, max_ticks=10)
+        sim.setup_match()
         history = sim.simulate()
         
         # Verify map dimensions and tick 0 entities
