@@ -1,5 +1,5 @@
 from django.test import TestCase
-from matches.engine import Entity, NavigationGrid, SpatialGrid
+from matches.engine import Entity, NavigationGrid, SpatialGrid, AStarPathfinder
 from matches.utils import Vector2D
 from matches.actions import MoveAction
 import math
@@ -9,6 +9,7 @@ class MockGameState:
     def __init__(self, width, height):
         self.nav_grid = NavigationGrid(width, height)
         self.grid = SpatialGrid(width, height)
+        self.pathfinder = AStarPathfinder(self.nav_grid)
         self.entities = {}
         self.resources = {'p1': 0, 'p2': 0}
         self.width = width

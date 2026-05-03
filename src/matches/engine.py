@@ -4,6 +4,7 @@ import json
 import math
 from .loader import UNIT_DEFINITIONS
 from .utils import Vector2D
+from .pathfinding import AStarPathfinder
 from .actions import GatherAction, AttackAction, MoveAction, HoldAction
 
 class Map:
@@ -156,6 +157,7 @@ class Entity:
         self.last_patch_id = None
         self.production_queue = []
         self.production_progress = 0
+        self.waypoints = [] # For A* pathfinding
         
         # Load definitions from YAML
         self.definition = UNIT_DEFINITIONS.get(unit_type, {})
@@ -218,6 +220,11 @@ class Entity:
             'width': self.width,
             'height': self.height
         }
+
+    def set_action(self, action):
+        """Changes the current action and clears pathfinding waypoints."""
+        self.action = action
+        self.waypoints = []
 
     def take_damage(self, amount):
         self.hp -= amount
@@ -503,7 +510,7 @@ class ProductionAI:
                     # Find a job (locally)
                     patch_id = GatherAction(None)._find_best_patch(ent, simulator, max_dist=30.0)
                     if patch_id:
-                        ent.action = GatherAction(patch_id)
+                        ent.set_action(GatherAction(patch_id))
 
 class MatchSimulator:
     """Handles the simulation loop of a match using JSON Deltas for efficiency"""
@@ -528,13 +535,14 @@ class MatchSimulator:
 
         self.max_ticks = max_ticks
         self.entities = {} # Use dict for fast lookup by ID
+        self.grid = SpatialGrid(self.map_data.width, self.map_data.height)
+        self.nav_grid = NavigationGrid(self.map_data.width, self.map_data.height)
+        self.pathfinder = AStarPathfinder(self.nav_grid)
         self.history = [] # Stores deltas
         self.resources = {
             self.player1_id: 50.0,
             self.player2_id: 50.0
         }
-        self.grid = SpatialGrid(self.map_data.width, self.map_data.height)
-        self.nav_grid = NavigationGrid(self.map_data.width, self.map_data.height)
         self.ai_controllers = [
             ProductionAI(self.player1_id),
             ProductionAI(self.player2_id)
@@ -582,7 +590,7 @@ class MatchSimulator:
             # Use max_dist=50 for initial spawns to accommodate slightly spread layouts
             patch_id = GatherAction(None)._find_best_patch(entity, self, max_dist=50.0)
             if patch_id:
-                entity.action = GatherAction(patch_id)
+                entity.set_action(GatherAction(patch_id))
         
         elif entity.type in ['marine', 'zealot', 'zergling']:
             # Combat units attack nearest enemy
@@ -591,7 +599,7 @@ class MatchSimulator:
                       and e.status != 'dead' and e.type != 'mineral_patch']
             if enemies:
                 closest = min(enemies, key=lambda e: entity.pos.dist_to_sq(e.pos))
-                entity.action = AttackAction(closest.id)
+                entity.set_action(AttackAction(closest.id))
 
     def setup_match(self):
         # 1. Minerals FIRST so workers can find them when spawned
@@ -662,14 +670,14 @@ class MatchSimulator:
         for trigger in self.triggers.get(0, []):
             entity = self.entities.get(trigger['entity_id'])
             if entity:
-                entity.action = trigger['action']
+                entity.set_action(trigger['action'])
 
         for tick in range(1, self.max_ticks + 1):
             # 1. Execute triggers for this tick
             for trigger in self.triggers.get(tick, []):
                 entity = self.entities.get(trigger['entity_id'])
                 if entity:
-                    entity.action = trigger['action']
+                    entity.set_action(trigger['action'])
 
             # 2. Update Controllers
             for ai in self.ai_controllers:

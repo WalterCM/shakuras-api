@@ -69,8 +69,23 @@ class GatherAction(Action):
                     # Stay in 'moving_to_patch' phase so it shows as 'harvest' status
                     # but don't move - waiting for patch to free up
                     pass
+        # Keep moving
+        if actual_dist > 5.0 and not entity.waypoints:
+            # Long distance - get a path
+            raw_path = game_state.pathfinder.find_path(entity.pos, patch.pos, entity=entity)
+            if raw_path:
+                entity.waypoints = game_state.pathfinder.smooth_path(raw_path, entity, game_state)
+        
+        # Follow path if we have one
+        if entity.waypoints:
+            target = entity.waypoints[0]
+            if entity.pos.dist_to(target) < 0.5:
+                entity.waypoints.pop(0)
+                if entity.waypoints:
+                    target = entity.waypoints[0]
+            entity.move_towards(target, game_state)
         else:
-            # Keep moving
+            # Direct move if close or no path found
             entity.move_towards(patch.pos, game_state)
     
     def _mine(self, entity, game_state):
@@ -196,7 +211,20 @@ class AttackAction(Action):
                 entity.current_cooldown = entity.cooldown
         else:
             # Move into range
-            entity.move_towards(target.pos, game_state)
+            if actual_dist > 5.0 and not entity.waypoints:
+                raw_path = game_state.pathfinder.find_path(entity.pos, target.pos, entity=entity)
+                if raw_path:
+                    entity.waypoints = game_state.pathfinder.smooth_path(raw_path, entity, game_state)
+
+            if entity.waypoints:
+                wp = entity.waypoints[0]
+                if entity.pos.dist_to(wp) < 0.5:
+                    entity.waypoints.pop(0)
+                    if entity.waypoints:
+                        wp = entity.waypoints[0]
+                entity.move_towards(wp, game_state)
+            else:
+                entity.move_towards(target.pos, game_state)
     
     def get_status(self):
         return 'attack'
@@ -209,15 +237,28 @@ class MoveAction(Action):
         self.destination = destination
     
     def update(self, entity, game_state):
-        diff = self.destination - entity.pos
-        dist = diff.length()
+        # 1. Initialize path if needed
+        if not entity.waypoints:
+            raw_path = game_state.pathfinder.find_path(entity.pos, self.destination, entity=entity)
+            if raw_path:
+                entity.waypoints = game_state.pathfinder.smooth_path(raw_path, entity, game_state)
+            else:
+                # No path found or already at destination tile
+                entity.waypoints = [self.destination]
+
+        # 2. Check if we've reached the current waypoint
+        target = entity.waypoints[0]
+        dist = entity.pos.dist_to(target)
         
         if dist < 0.5:
-            # Arrived
-            entity.action = None
-        else:
-            # Keep moving
-            entity.move_towards(self.destination, game_state)
+            entity.waypoints.pop(0)
+            if not entity.waypoints:
+                entity.action = None
+                return
+            target = entity.waypoints[0]
+
+        # 3. Move towards the current target (waypoint or final destination)
+        entity.move_towards(target, game_state)
     
     def get_status(self):
         return 'move'
