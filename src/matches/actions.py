@@ -3,6 +3,7 @@ Action system for unit behaviors.
 Each action class represents a command button in StarCraft.
 """
 from abc import ABC, abstractmethod
+from .utils import rect_dist
 
 
 class Action(ABC):
@@ -47,9 +48,7 @@ class GatherAction(Action):
             patch = game_state.entities.get(self.target_patch_id)
         
         # Move towards patch
-        diff = patch.pos - entity.pos
-        dist = diff.length()
-        actual_dist = max(0, dist - entity.radius - patch.radius)
+        actual_dist = rect_dist(entity.pos, entity.width, entity.height, patch.pos, patch.width, patch.height)
         
         if actual_dist <= entity.range:
             # Arrived at patch - check if we should stay or look for a free one
@@ -115,9 +114,7 @@ class GatherAction(Action):
         closest_base = min(bases, key=lambda b: entity.pos.dist_to_sq(b.pos))
         
         # Move towards base
-        diff = closest_base.pos - entity.pos
-        dist = diff.length()
-        actual_dist = max(0, dist - entity.radius - closest_base.radius)
+        actual_dist = rect_dist(entity.pos, entity.width, entity.height, closest_base.pos, closest_base.width, closest_base.height)
         
         if actual_dist <= entity.range:
             # Arrived - deposit minerals
@@ -189,11 +186,8 @@ class AttackAction(Action):
             entity.action = None
             return
         
-        diff = target.pos - entity.pos
-        dist = diff.length()
-        
         # Adjust distance for radii (edge-to-edge)
-        actual_dist = max(0, dist - entity.radius - target.radius)
+        actual_dist = rect_dist(entity.pos, entity.width, entity.height, target.pos, target.width, target.height)
         
         if actual_dist <= entity.range:
             # In range - attack if cooldown ready

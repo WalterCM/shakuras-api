@@ -2,7 +2,7 @@ import uuid
 import random
 import json
 import math
-from .data import UNIT_STATS
+from .loader import UNIT_DEFINITIONS
 from .utils import Vector2D
 from .actions import GatherAction, AttackAction, MoveAction, HoldAction
 
@@ -41,21 +41,30 @@ class SpatialGrid:
         self.grid = {}
 
     def insert(self, entity):
-        cell = self._get_cell(entity.pos)
-        if cell not in self.grid:
-            self.grid[cell] = []
-        self.grid[cell].append(entity.id)
+        """Registers entity in all cells it overlaps with its rectangular dimensions."""
+        x1 = int((entity.pos.x - entity.width/2) / self.cell_size)
+        y1 = int((entity.pos.y - entity.height/2) / self.cell_size)
+        x2 = int((entity.pos.x + entity.width/2) / self.cell_size)
+        y2 = int((entity.pos.y + entity.height/2) / self.cell_size)
+        
+        for col in range(x1, x2 + 1):
+            for row in range(y1, y2 + 1):
+                cell = (col, row)
+                if cell not in self.grid:
+                    self.grid[cell] = []
+                self.grid[cell].append(entity.id)
 
     def get_nearby_ids(self, pos):
-        """Returns entity IDs in the current and 8 surrounding cells."""
+        """Returns UNIQUE entity IDs in the current and 8 surrounding cells."""
         cx, cy = self._get_cell(pos)
-        nearby = []
+        nearby = set()
         for i in range(-1, 2):
             for j in range(-1, 2):
                 cell = (cx + i, cy + j)
                 if cell in self.grid:
-                    nearby.extend(self.grid[cell])
-        return nearby
+                    for eid in self.grid[cell]:
+                        nearby.add(eid)
+        return list(nearby)
 
 class NavigationGrid:
     """Handles tile-based occupancy for pathfinding and collision avoidance."""
@@ -68,17 +77,33 @@ class NavigationGrid:
         self.dynamic_grid = [[None for _ in range(height)] for _ in range(width)]
 
     def is_blocked(self, pos, check_dynamic=True, entity=None):
+        """Checks if a point is blocked by static or dynamic objects."""
         x, y = int(pos.x), int(pos.y)
         if x < 0 or x >= self.width or y < 0 or y >= self.height:
             return True # Edge of map
         
-        # Static Layer
+        # Static Layer (Buildings/Minerals)
         if self.static_grid[x][y] and (not entity or self.static_grid[x][y] != entity.id):
             return True
         
-        # Dynamic Layer
+        # Dynamic Layer (Units)
         if check_dynamic and self.dynamic_grid[x][y] and (not entity or self.dynamic_grid[x][y] != entity.id):
             return True
+        return False
+    
+    def is_area_blocked(self, x, y, width, height, check_dynamic=True, entity=None):
+        """Checks if a rectangular area is partially or fully blocked."""
+        # Use small epsilon to allow some "squeezing" through gaps
+        x1, y1 = math.floor(x - width/2 + 0.1), math.floor(y - height/2 + 0.1)
+        x2, y2 = math.floor(x + width/2 - 0.1), math.floor(y + height/2 - 0.1)
+        for ox in range(x1, x2 + 1):
+            for oy in range(y1, y2 + 1):
+                if ox < 0 or ox >= self.width or oy < 0 or oy >= self.height:
+                    return True
+                if self.static_grid[ox][oy] and (not entity or self.static_grid[ox][oy] != entity.id):
+                    return True
+                if check_dynamic and self.dynamic_grid[ox][oy] and (not entity or self.dynamic_grid[ox][oy] != entity.id):
+                    return True
         return False
 
     def clear_dynamic(self):
@@ -86,13 +111,29 @@ class NavigationGrid:
             for y in range(self.height):
                 self.dynamic_grid[x][y] = None
 
+    def set_static_rect(self, x, y, width, height, entity_id):
+        x1, y1 = math.floor(x - width/2 + 0.01), math.floor(y - height/2 + 0.01)
+        x2, y2 = math.floor(x + width/2 - 0.01), math.floor(y + height/2 - 0.01)
+        for ox in range(x1, x2 + 1):
+            for oy in range(y1, y2 + 1):
+                if 0 <= ox < self.width and 0 <= oy < self.height:
+                    self.static_grid[ox][oy] = entity_id
+
     def set_static(self, x, y, entity_id):
-        if 0 <= x < self.width and 0 <= y < self.height:
-            self.static_grid[int(x)][int(y)] = entity_id
+        """Legacy/Single-tile alias"""
+        self.set_static_rect(x, y, 1, 1, entity_id)
+
+    def set_dynamic_rect(self, x, y, width, height, entity_id):
+        x1, y1 = math.floor(x - width/2 + 0.01), math.floor(y - height/2 + 0.01)
+        x2, y2 = math.floor(x + width/2 - 0.01), math.floor(y + height/2 - 0.01)
+        for ox in range(x1, x2 + 1):
+            for oy in range(y1, y2 + 1):
+                if 0 <= ox < self.width and 0 <= oy < self.height:
+                    self.dynamic_grid[ox][oy] = entity_id
 
     def set_dynamic(self, x, y, entity_id):
-        if 0 <= x < self.width and 0 <= y < self.height:
-            self.dynamic_grid[int(x)][int(y)] = entity_id
+        """Legacy/Single-tile alias"""
+        self.set_dynamic_rect(x, y, 1, 1, entity_id)
 
     def get_obstacle_at(self, pos):
         x, y = int(pos.x), int(pos.y)
@@ -116,19 +157,18 @@ class Entity:
         self.production_queue = []
         self.production_progress = 0
         
-        # Load stats from data.py
-        stats = UNIT_STATS.get(unit_type, UNIT_STATS['worker'])
-        self.hp = stats['hp']
-        self.max_hp = stats.get('max_hp', stats['hp'])
-        self.damage = stats['damage']
-        self.range = stats['range']
-        self.cooldown = stats['cooldown']
-        self.speed = stats['speed']
-        self.harvest_time = stats.get('harvest_time', 0)
-        self.harvest_amount = stats.get('harvest_amount', 0)
-        self.radius = stats.get('radius', 1.0)
-        self.width = stats.get('width', 1)
-        self.height = stats.get('height', 1)
+        # Load definitions from YAML
+        self.definition = UNIT_DEFINITIONS.get(unit_type, {})
+        self.hp = self.definition.get('hp', 100)
+        self.max_hp = self.definition.get('max_hp', self.hp)
+        self.damage = self.definition.get('damage', 0)
+        self.range = self.definition.get('range', 1.0)
+        self.cooldown = self.definition.get('cooldown', 20)
+        self.speed = self.definition.get('speed', 0)
+        self.harvest_time = self.definition.get('harvest_time', 0)
+        self.harvest_amount = self.definition.get('harvest_amount', 0)
+        self.width = self.definition.get('width', 1.0)
+        self.height = self.definition.get('height', 1.0)
         self.current_cooldown = 0
         
         # Resource contention tracking
@@ -142,6 +182,8 @@ class Entity:
 
     def get_current_status(self, game_state=None):
         """Returns the status string from the current action or default"""
+        if self.status == 'dead':
+            return 'dead'
         if self.action:
             try:
                 # Some actions might not take game_state yet, but GatherAction does
@@ -155,6 +197,11 @@ class Entity:
                 return self.status
         return self.status
 
+    @property
+    def radius(self):
+        """Backward compatibility: Approximate radius from width/height"""
+        return (self.width + self.height) / 4.0
+
     def to_dict(self, game_state=None):
         return {
             'id': self.id,
@@ -167,7 +214,7 @@ class Entity:
             'carrying': self.carrying,
             'prod_queue': self.production_queue,
             'prod_progress': self.production_progress,
-            'radius': self.radius,
+            'radius': round(self.radius, 2),
             'width': self.width,
             'height': self.height
         }
@@ -237,14 +284,14 @@ class Entity:
         d = step
         while d <= probe_dist:
             check_pos = self.pos + direction * d
-            if game_state.nav_grid.is_blocked(check_pos, check_dynamic=not am_gathering, entity=self):
+            if game_state.nav_grid.is_area_blocked(check_pos.x, check_pos.y, self.width, self.height, check_dynamic=not am_gathering, entity=self):
                 is_blocked = True
                 break
             d += step
             
         if not is_blocked:
             probe_pos = self.pos + direction * probe_dist
-            if game_state.nav_grid.is_blocked(probe_pos, check_dynamic=not am_gathering, entity=self):
+            if game_state.nav_grid.is_area_blocked(probe_pos.x, probe_pos.y, self.width, self.height, check_dynamic=not am_gathering, entity=self):
                 is_blocked = True
         
         # If we're currently sliding, check if we've cleared the obstacle
@@ -278,13 +325,13 @@ class Entity:
         orig_diff = target_pos - self.pos
         orig_dir = orig_diff.normalize()
         
-        def get_clearance(test_dir, max_d=1.8):
-            step = 0.5
+        def get_clearance(test_dir, max_d=3.5):
+            step = 0.25
             d = step
             last_safe = 0
             while d <= max_d:
                 p = self.pos + test_dir * d
-                if game_state.nav_grid.is_blocked(p, check_dynamic=not am_gathering, entity=self):
+                if game_state.nav_grid.is_area_blocked(p.x, p.y, self.width, self.height, check_dynamic=not am_gathering, entity=self):
                     break
                 last_safe = d
                 d += step
@@ -387,60 +434,42 @@ class Entity:
             self.pos.y = max(0, min(self.pos.y, game_state.map_data.height))
 
     def _apply_repulsion(self, game_state):
-        """Pushes away from nearby entities to prevent overlapping"""
+        """Pushes away from nearby units to prevent overlapping based on rectangular dimensions"""
         if not hasattr(game_state, 'grid'):
             return
             
         nearby_ids = game_state.grid.get_nearby_ids(self.pos)
         
         from .actions import GatherAction
+        from .utils import rect_dist, Vector2D
+        import random
         am_gathering = isinstance(self.action, GatherAction)
         
-        my_radius = self.radius
-        
-        for other_id in nearby_ids:
-            if other_id == self.id:
-                continue
-            other = game_state.entities.get(other_id)
-            if not other or other.status == 'dead':
+        for eid in nearby_ids:
+            if eid == self.id: continue
+            other = game_state.entities.get(eid)
+            if not other or other.status == 'dead' or other.definition.get('category') in ['building', 'resource']:
                 continue
             
-            # Static structures are handled perfectly by the NavGrid logic.
-            # Repelling units from static structures causes erratic behavior in concave corners
-            # because the multiple radial overlaps squeeze the unit and force it through walls.
-            if other.type in ['base', 'mineral_patch', 'building']:
-                continue
-                
             # WORKER GHOSTING: 
             # Workers assigned to minerals ignore collision with other gathering workers to prevent gridlocks.
             if am_gathering and other.type == 'worker' and isinstance(other.action, GatherAction):
                 continue
 
-            diff = self.pos - other.pos
-            dist_sq = diff.length_sq()
-            min_dist = my_radius + other.radius
-            
-            if dist_sq < min_dist**2:
-                # Normal unit vs unit repulsion (share the push)
-                push_factor = 0.2
-                
-                if dist_sq > 0.001:
-                    dist = math.sqrt(dist_sq)
-                    overlap = min_dist - dist
-                    push = diff.normalize() * (overlap * push_factor)
-                    self.pos += push
-                else:
-                    # Deterministic push for perfectly stacked units
-                    angle = (hash(self.id + other_id) % 360) * (math.pi / 180)
-                    push_dist = min_dist * push_factor
-                    self.pos.x += math.cos(angle) * push_dist
-                    self.pos.y += math.sin(angle) * push_dist
+            dist = rect_dist(self.pos, self.width, self.height, other.pos, other.width, other.height)
+            if dist <= 0: # Overlapping
+                # Repel
+                overlap_depth = 0.2 # Small constant push if overlapping
+                push_dir = (self.pos - other.pos).normalize()
+                if push_dir.length_sq() < 0.01:
+                    push_dir = Vector2D(random.uniform(-1,1), random.uniform(-1,1)).normalize()
+                self.pos += push_dir * overlap_depth
 
 
     def _handle_production(self, game_state):
         unit_type = self.production_queue[0]
-        stats = UNIT_STATS.get(unit_type)
-        build_time = stats['build_time']
+        stats = UNIT_DEFINITIONS.get(unit_type)
+        build_time = stats.get('build_time', 100)
         
         self.production_progress += 1
         
@@ -518,8 +547,8 @@ class MatchSimulator:
 
     def request_unit(self, player_id, unit_type):
         """Attempts to queue a unit for production"""
-        stats = UNIT_STATS.get(unit_type)
-        if not stats or self.resources[player_id] < stats['cost']:
+        stats = UNIT_DEFINITIONS.get(unit_type)
+        if not stats or self.resources[player_id] < stats.get('cost', {}).get('minerals', 0):
             return False
             
         # Find an appropriate production building (just 'base' for now)
@@ -533,7 +562,7 @@ class MatchSimulator:
         best_base = min(bases, key=lambda b: len(b.production_queue))
         
         if len(best_base.production_queue) < 5: # Max queue length
-            self.resources[player_id] -= stats['cost']
+            self.resources[player_id] -= stats.get('cost', {}).get('minerals', 0)
             best_base.production_queue.append(unit_type)
             return True
             
@@ -543,11 +572,8 @@ class MatchSimulator:
         self.entities[entity.id] = entity
         
         # Update Nav Grid for buildings/minerals
-        if entity.type in ['base', 'mineral_patch']:
-            bx, by = int(entity.pos.x - entity.width/2), int(entity.pos.y - entity.height/2)
-            for ox in range(entity.width):
-                for oy in range(entity.height):
-                    self.nav_grid.set_static(bx + ox, by + oy, entity.id)
+        if entity.definition.get('category') in ['building', 'resource']:
+            self.nav_grid.set_static_rect(entity.pos.x, entity.pos.y, entity.width, entity.height, entity.id)
 
         # Assign default actions to newly spawned units
         from .actions import GatherAction, AttackAction
@@ -654,8 +680,8 @@ class MatchSimulator:
             for ent in self.entities.values():
                 if ent.status != 'dead':
                     self.grid.insert(ent)
-                    if ent.type not in ['base', 'mineral_patch']:
-                        self.nav_grid.set_dynamic(ent.pos.x, ent.pos.y, ent.id)
+                    if ent.definition.get('category') == 'unit':
+                        self.nav_grid.set_dynamic_rect(ent.pos.x, ent.pos.y, ent.width, ent.height, ent.id)
             
             # Clean up static grid for depleted minerals
             # (In a real engine we'd do this on death, but here we can refresh if needed)

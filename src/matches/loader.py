@@ -8,6 +8,27 @@ from pathlib import Path
 
 MAPS_DIR = Path(__file__).parent.parent.parent / 'maps'
 SCENARIOS_DIR = Path(__file__).parent.parent.parent / 'scenarios'
+DEFINITIONS_DIR = Path(__file__).parent.parent.parent / 'definitions'
+
+
+def load_unit_definitions():
+    """Loads all unit and building stats from definitions/units.yaml"""
+    path = DEFINITIONS_DIR / 'units.yaml'
+    if not path.exists():
+        return {}
+    
+    with open(path, 'r') as f:
+        data = yaml.safe_load(f)
+        
+    # Flatten the race-based structure into a single lookup dict
+    definitions = {}
+    for race, units in data.items():
+        for unit_id, stats in units.items():
+            definitions[unit_id] = stats
+    return definitions
+
+
+UNIT_DEFINITIONS = load_unit_definitions()
 
 
 class MapLoadError(Exception):

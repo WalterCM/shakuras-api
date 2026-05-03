@@ -10,7 +10,7 @@ from matches.engine import Entity, MatchSimulator, SpatialGrid, Map
 from matches.utils import Vector2D
 from matches.actions import MoveAction, AttackAction, GatherAction
 import math
-from matches.data import UNIT_STATS
+from matches.loader import UNIT_DEFINITIONS
 
 MATCHES_URL = reverse('matches:match-list')
 
@@ -92,9 +92,9 @@ class EngineCoreTests(TestCase):
     """Test the core logic of the Match Engine"""
 
     def test_entity_stats_initialization(self):
-        """Verify Entity loads correct stats from data.py"""
+        """Verify Entity loads correct stats from YAML definitions"""
         entity = Entity('marine', 'p1', 10, 10)
-        stats = UNIT_STATS['marine']
+        stats = UNIT_DEFINITIONS['marine']
         
         self.assertEqual(entity.hp, stats['hp'])
         self.assertEqual(entity.damage, stats['damage'])
@@ -252,7 +252,7 @@ class EngineCoreTests(TestCase):
         worker.carrying = 8
         worker.get_current_status() # Initialize action if any
         
-        worker.take_damage(40) # Death
+        worker.take_damage(60) # Death (SCV has 60 HP)
         self.assertEqual(worker.get_current_status(), 'dead')
         self.assertEqual(worker.carrying, 0)
 

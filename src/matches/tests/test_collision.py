@@ -94,15 +94,15 @@ class GridCollisionTests(TestCase):
         # But leave small gaps at corners for workers to potentially escape
         # Top and bottom walls
         for x in range(10, 14):
-            gs._spawn_entity(Entity('mineral_patch', 'neutral', x + 0.5, 10.5))
-            gs._spawn_entity(Entity('mineral_patch', 'neutral', x + 0.5, 13.5))
+            gs._spawn_entity(Entity('neutral_block', 'neutral', x + 0.5, 10.5))
+            gs._spawn_entity(Entity('neutral_block', 'neutral', x + 0.5, 13.5))
         # Left and right walls  
         for y in range(11, 13):
-            gs._spawn_entity(Entity('mineral_patch', 'neutral', 10.5, y + 0.5))
-            gs._spawn_entity(Entity('mineral_patch', 'neutral', 13.5, y + 0.5))
+            gs._spawn_entity(Entity('neutral_block', 'neutral', 10.5, y + 0.5))
+            gs._spawn_entity(Entity('neutral_block', 'neutral', 13.5, y + 0.5))
                 
-        # Worker trapped inside at center (12, 12)
-        worker = Entity('worker', 'p1', 12, 12)
+        # Worker trapped inside at center (12.5, 12.5)
+        worker = Entity('worker', 'p1', 12.5, 12.5)
         worker.action = MoveAction(Vector2D(50, 50))
         gs._spawn_entity(worker)
 

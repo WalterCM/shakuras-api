@@ -1,0 +1,119 @@
+# StarCraft: BroodWar Unit and Building Definitions
+# Dimensions are in Tiles (1 Tile = 32x32 pixels)
+
+terran:
+  base:
+    name: "Command Center"
+    category: "building"
+    hp: 1500
+    armor: 1
+    width: 4
+    height: 3
+    cost:
+      minerals: 400
+    build_time: 120
+    sight: 10
+    can_produce: ["worker"]
+  
+  worker:
+    name: "SCV"
+    category: "unit"
+    hp: 60
+    armor: 0
+    width: 0.7
+    height: 0.7
+    speed: 1.88
+    damage: 5
+    range: 0.1
+    cooldown: 15
+    harvest_time: 30
+    harvest_amount: 8
+    cost:
+      minerals: 50
+    build_time: 20
+    sight: 7
+    can_harvest: true
+
+  marine:
+    name: "Marine"
+    category: "unit"
+    hp: 40
+    armor: 0
+    width: 0.6
+    height: 0.6
+    speed: 1.88
+    damage: 6
+    range: 4.0
+    cooldown: 15
+    cost:
+      minerals: 50
+    build_time: 24
+    sight: 7
+
+protoss:
+  zealot:
+    name: "Zealot"
+    category: "unit"
+    hp: 100
+    shields: 60
+    armor: 1
+    width: 0.8
+    height: 0.8
+    speed: 1.88
+    damage: 16
+    range: 0.1
+    cooldown: 22
+    cost:
+      minerals: 100
+    build_time: 40
+    sight: 7
+
+zerg:
+  zergling:
+    name: "Zergling"
+    category: "unit"
+    hp: 35
+    armor: 0
+    width: 0.5
+    height: 0.5
+    speed: 2.6
+    damage: 5
+    range: 0.1
+    cooldown: 8
+    cost:
+      minerals: 25
+    build_time: 28
+    sight: 5
+
+neutral:
+  mineral_patch:
+    name: "Mineral Field"
+    category: "resource"
+    hp: 1500
+    width: 2
+    height: 1
+    cost:
+      minerals: 0
+    build_time: 0
+
+  neutral_block:
+    name: "Block"
+    category: "resource"
+    hp: 1000
+    width: 1
+    height: 1
+
+  slow_worker:
+    name: "Slow Worker"
+    category: "unit"
+    hp: 60
+    damage: 5
+    range: 1.0
+    speed: 0.1
+    cooldown: 20
+    width: 0.7
+    height: 0.7
+    cost:
+      minerals: 50
+    build_time: 20
+

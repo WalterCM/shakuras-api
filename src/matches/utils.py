@@ -45,3 +45,11 @@ class Vector2D:
 
     def __repr__(self):
         return f"Vec({round(self.x, 2)}, {round(self.y, 2)})"
+
+def rect_dist(pos1, w1, h1, pos2, w2, h2):
+    """Calculates the edge-to-edge distance between two rectangles."""
+    dx = max(0, abs(pos1.x - pos2.x) - (w1 + w2) / 2)
+    dy = max(0, abs(pos1.y - pos2.y) - (h1 + h2) / 2)
+    if dx == 0: return dy
+    if dy == 0: return dx
+    return math.sqrt(dx**2 + dy**2)

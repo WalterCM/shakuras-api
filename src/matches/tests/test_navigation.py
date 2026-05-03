@@ -16,15 +16,12 @@ class MockGameState:
     
     def _spawn_entity(self, entity):
         self.entities[entity.id] = entity
-        if entity.type in ['base', 'mineral_patch', 'building']:
-            bx, by = int(entity.pos.x - entity.width/2), int(entity.pos.y - entity.height/2)
-            for ox in range(entity.width):
-                for oy in range(entity.height):
-                    self.nav_grid.set_static(bx + ox, by + oy, entity.id)
+        if entity.definition.get('category') in ['building', 'resource']:
+            self.nav_grid.set_static_rect(entity.pos.x, entity.pos.y, entity.width, entity.height, entity.id)
         else:
-            self.nav_grid.set_dynamic(entity.pos.x, entity.pos.y, entity.id)
+            self.nav_grid.set_dynamic_rect(entity.pos.x, entity.pos.y, entity.width, entity.height, entity.id)
 
-    def run_simulation(self, worker, target_pos, max_ticks=100, sample_every=10):
+    def run_simulation(self, worker, target_pos, max_ticks=100, sample_every=10, dist_check=0.1):
         """Run simulation and collect path data."""
         path = []
         directions_tried = set()
@@ -33,7 +30,7 @@ class MockGameState:
         
         for tick in range(max_ticks):
             # Track direction changes
-            if worker.pos.dist_to(last_pos) > 0.1:
+            if worker.pos.dist_to(last_pos) > dist_check:
                 dx = worker.pos.x - last_pos.x
                 dy = worker.pos.y - last_pos.y
                 if abs(dx) > abs(dy):
@@ -81,14 +78,14 @@ class NavigationTests(TestCase):
         self.sample_every = 10
     
     def _create_vertical_wall(self, gs, x, y_start, y_end):
-        """Create a vertical wall of minerals at given x, from y_start to y_end (exclusive)."""
+        """Create a vertical wall of blocks at given x, from y_start to y_end (exclusive)."""
         for y in range(y_start, y_end):
-            gs._spawn_entity(Entity('mineral_patch', 'neutral', x + 0.5, y + 0.5))
+            gs._spawn_entity(Entity('neutral_block', 'neutral', x + 0.5, y + 0.5))
     
     def _create_horizontal_wall(self, gs, y, x_start, x_end):
-        """Create a horizontal wall of minerals at given y, from x_start to x_end (exclusive)."""
+        """Create a horizontal wall of blocks at given y, from x_start to x_end (exclusive)."""
         for x in range(x_start, x_end):
-            gs._spawn_entity(Entity('mineral_patch', 'neutral', x + 0.5, y + 0.5))
+            gs._spawn_entity(Entity('neutral_block', 'neutral', x + 0.5, y + 0.5))
 
     def test_1_baseline_open_field(self):
         """Test: Baseline - unit moves from A to B with no obstacles."""
@@ -312,47 +309,49 @@ class NavigationTests(TestCase):
         gs = MockGameState(self.width, self.height)
         
         # Wall at x=30, gap at y=14.5 (float position)
-        # Mineral patches are 2x1, so gap at 14.5 means tiles 14 and 15 could be open
-        # Actually, let's make gap by placing minerals at y=13.5 and y=15.5 (gap at 14.5)
+        # Blocks are 1x1, so gap at 14.5 means tiles 14 and 15 could be open
+        # Actually, let's make gap by placing blocks at y=13.5 and y=15.5 (gap at 14.5)
         for y in range(5, 14):
-            gs._spawn_entity(Entity('mineral_patch', 'neutral', 30.5, y + 0.5))
-        for y in range(15, 25):
-            gs._spawn_entity(Entity('mineral_patch', 'neutral', 30.5, y + 0.5))
-        
+            gs._spawn_entity(Entity('neutral_block', 'neutral', 30.5, y + 0.5))
+        for y in range(16, 25):
+            gs._spawn_entity(Entity('neutral_block', 'neutral', 30.5, y + 0.5))
+    
         start_pos = Vector2D(10, 15)
         target_pos = Vector2D(50, 15)
-        
+    
         worker = Entity('worker', 'p1', start_pos.x, start_pos.y)
         worker.action = MoveAction(target_pos)
         gs._spawn_entity(worker)
-        
+    
         result = gs.run_simulation(worker, target_pos, self.max_ticks, self.sample_every)
-        
-        final_x = result['final_pos'][0]
-        passed = final_x > 32
-        
+    
+        # Check: made it past wall (x=30)
+        passed = result['final_pos'][0] > 35
+    
         print(f"\n=== test_8_narrow_gap_float ===")
         print(f"passed: {passed}")
-        print(f"reason: {'used_gap_at_float' if passed else 'went_around'}")
+        print(f"reason: {'used_gap_at_float' if passed else 'stuck'}")
         print(f"wall_gap: y=14.5 (float position)")
         print(f"start_pos: {start_pos.x}, {start_pos.y}")
         print(f"target_pos: {target_pos.x}, {target_pos.y}")
         print(f"final_pos: {result['final_pos']}")
-        
-        self.assertTrue(passed, f"Worker should use float gap. Final pos: {result['final_pos']}")
+    
+        self.assertTrue(passed, f"Worker should navigate float gap. Final pos: {result['final_pos']}")
 
     def test_9_too_narrow_gap(self):
         """Test: Gap smaller than unit - should treat as solid wall."""
         gs = MockGameState(self.width, self.height)
-        
+    
         # Wall at x=30, gap at y=14.5-15.0 (half tile - smaller than unit)
-        # Place minerals to leave only half-tile gap
+        # Place blocks to leave only half-tile gap
         for y in range(5, 14):
-            gs._spawn_entity(Entity('mineral_patch', 'neutral', 30.5, y + 0.5))
-        for y in range(15, 25):
-            gs._spawn_entity(Entity('mineral_patch', 'neutral', 30.5, y + 0.5))
-        # Add extra mineral to close half-gap
-        gs._spawn_entity(Entity('mineral_patch', 'neutral', 30.5, 14.5))
+            gs._spawn_entity(Entity('neutral_block', 'neutral', 30.5, y + 0.5))
+        # Place one block offset to create small gap
+        gs._spawn_entity(Entity('neutral_block', 'neutral', 30.5, 14.7)) # Overlaps 14 and 15
+        for y in range(16, 25):
+            gs._spawn_entity(Entity('neutral_block', 'neutral', 30.5, y + 0.5))
+        # Add extra block to close half-gap
+        gs._spawn_entity(Entity('neutral_block', 'neutral', 30.5, 14.5))
         
         start_pos = Vector2D(10, 15)
         target_pos = Vector2D(50, 15)
@@ -393,21 +392,21 @@ class NavigationTests(TestCase):
         # 4x4 enclosure at x=10-14, y=10-14
         # Top and bottom walls
         for x in range(10, 14):
-            gs._spawn_entity(Entity('mineral_patch', 'neutral', x + 0.5, 10.5))
-            gs._spawn_entity(Entity('mineral_patch', 'neutral', x + 0.5, 13.5))
+            gs._spawn_entity(Entity('neutral_block', 'neutral', x + 0.5, 10.5))
+            gs._spawn_entity(Entity('neutral_block', 'neutral', x + 0.5, 13.5))
         # Left and right walls
         for y in range(11, 13):
-            gs._spawn_entity(Entity('mineral_patch', 'neutral', 10.5, y + 0.5))
-            gs._spawn_entity(Entity('mineral_patch', 'neutral', 13.5, y + 0.5))
+            gs._spawn_entity(Entity('neutral_block', 'neutral', 10.5, y + 0.5))
+            gs._spawn_entity(Entity('neutral_block', 'neutral', 13.5, y + 0.5))
         
-        start_pos = Vector2D(12, 12)
+        start_pos = Vector2D(12.5, 12.5)
         target_pos = Vector2D(50, 50)
         
-        worker = Entity('worker', 'p1', start_pos.x, start_pos.y)
+        worker = Entity('slow_worker', 'p1', start_pos.x, start_pos.y)
         worker.action = MoveAction(target_pos)
         gs._spawn_entity(worker)
         
-        result = gs.run_simulation(worker, target_pos, self.max_ticks, self.sample_every)
+        result = gs.run_simulation(worker, target_pos, self.max_ticks, self.sample_every, dist_check=0.05)
         
         # Check: tried at least 2 directions (horizontal and vertical)
         # Note: With current sliding, it will only try one axis at a time

@@ -332,10 +332,27 @@
     let isPanning = false;
     let lastMousePos = { x: 0, y: 0 };
 
+    const UNIT_DEFS = JSON.parse(document.getElementById('unit_definitions').textContent);
+    
     const TOOL_STATS = {
-        'spawn-p1': { width: 4, height: 3, color: 'rgba(248,113,113,0.4)', solid: '#f87171' },
-        'spawn-p2': { width: 4, height: 3, color: 'rgba(96,165,250,0.4)', solid: '#60a5fa' },
-        'mineral':  { width: 2, height: 1, color: 'rgba(52,211,153,0.4)', solid: '#34d399' },
+        'spawn-p1': { 
+            width: UNIT_DEFS['base'].width, 
+            height: UNIT_DEFS['base'].height, 
+            color: 'rgba(248,113,113,0.4)', 
+            solid: '#f87171' 
+        },
+        'spawn-p2': { 
+            width: UNIT_DEFS['base'].width, 
+            height: UNIT_DEFS['base'].height, 
+            color: 'rgba(96,165,250,0.4)', 
+            solid: '#60a5fa' 
+        },
+        'mineral':  { 
+            width: UNIT_DEFS['mineral_patch'].width, 
+            height: UNIT_DEFS['mineral_patch'].height, 
+            color: 'rgba(52,211,153,0.4)', 
+            solid: '#34d399' 
+        },
         'delete':   { width: 1, height: 1, color: 'rgba(239,68,68,0.4)' }
     };
 
@@ -580,29 +597,33 @@
         ctx.lineWidth = 2 / scale;
         ctx.strokeRect(0, 0, mapWidth, mapHeight);
 
-        // Minerals (2x1)
+        // Minerals
+        const minW = TOOL_STATS['mineral'].width;
+        const minH = TOOL_STATS['mineral'].height;
         minerals.forEach(m => {
             ctx.fillStyle = '#34d399';
-            ctx.fillRect(m.x + 0.05, m.y + 0.05, 1.9, 0.9);
+            ctx.fillRect(m.x + 0.05, m.y + 0.05, minW - 0.1, minH - 0.1);
             ctx.strokeStyle = 'rgba(0,0,0,0.3)';
             ctx.lineWidth = 0.1 / scale;
-            ctx.strokeRect(m.x + 0.05, m.y + 0.05, 1.9, 0.9);
+            ctx.strokeRect(m.x + 0.05, m.y + 0.05, minW - 0.1, minH - 0.1);
         });
 
-        // Spawns (4x3)
+        // Spawns
+        const baseW = TOOL_STATS['spawn-p1'].width;
+        const baseH = TOOL_STATS['spawn-p1'].height;
         ['p1', 'p2'].forEach(pid => {
             const s = spawnPoints[pid];
             if (!s) return;
             ctx.fillStyle = pid === 'p1' ? '#f87171' : '#60a5fa';
-            ctx.fillRect(s.x + 0.1, s.y + 0.1, 3.8, 2.8);
+            ctx.fillRect(s.x + 0.1, s.y + 0.1, baseW - 0.2, baseH - 0.2);
             ctx.strokeStyle = 'white';
             ctx.lineWidth = 1 / scale;
-            ctx.strokeRect(s.x + 0.1, s.y + 0.1, 3.8, 2.8);
+            ctx.strokeRect(s.x + 0.1, s.y + 0.1, baseW - 0.2, baseH - 0.2);
             
             ctx.fillStyle = 'white';
             ctx.font = `${2}px Outfit`;
             ctx.textAlign = "center";
-            ctx.fillText(pid.toUpperCase(), s.x + 2, s.y + 2);
+            ctx.fillText(pid.toUpperCase(), s.x + baseW/2, s.y + baseH/2);
         });
 
         ctx.restore();
@@ -648,5 +669,6 @@
     // Init
     loadMapList();
 </script>
+{{ unit_definitions|json_script:"unit_definitions" }}
 </body>
 </html>

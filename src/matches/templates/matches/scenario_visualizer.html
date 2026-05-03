@@ -247,11 +247,13 @@
     </div>
 
     {{ scenarios|json_script:"scenarios_data" }}
+    {{ unit_definitions|json_script:"unit_definitions" }}
 
     <script>
         const canvas = document.getElementById('replay-canvas');
         const ctx = canvas.getContext('2d');
         const scenariosData = JSON.parse(document.getElementById('scenarios_data').textContent);
+        const UNIT_DEFS = JSON.parse(document.getElementById('unit_definitions').textContent);
 
         let replayData = null;
         
@@ -462,11 +464,13 @@
 
             Object.values(entitiesState).forEach(ent => {
                 if (ent.status === 'dead') return;
-                const dist = Math.sqrt((ent.x - worldX) ** 2 + (ent.y - worldY) ** 2);
-                const radius = ent.radius || 1.0;
+                const w = ent.width || 1;
+                const h = ent.height || 1;
+                
+                const isInside = worldX >= ent.x - w/2 && worldX <= ent.x + w/2 &&
+                                 worldY >= ent.y - h/2 && worldY <= ent.y + h/2;
 
-                if (dist < radius + 1.0 && dist < minDist) {
-                    minDist = dist;
+                if (isInside) {
                     closest = ent;
                 }
             });
@@ -598,11 +602,8 @@
                 let height = (entity.height || 1) * SCALE;
                 let radius = entity.radius ? entity.radius * SCALE : 6;
 
-                if (entity.type === 'base' || entity.type === 'mineral_patch') {
-                    ctx.roundRect(x - width / 2, y - height / 2, width, height, entity.type === 'base' ? 5 : 3);
-                } else {
-                    ctx.arc(x, y, radius, 0, Math.PI * 2);
-                }
+                // Render everything as rectangles now that we have width/height
+                ctx.roundRect(x - width / 2, y - height / 2, width, height, 2);
 
                 let baseColor = entity.owner_id === 'p1' ? '#3b82f6' : '#ef4444';
                 if (entity.owner_id === 'neutral') baseColor = '#eab308';
@@ -641,7 +642,8 @@
                 ctx.shadowBlur = 0;
                 ctx.closePath();
 
-                const maxHp = entity.type === 'base' ? 1500 : (entity.type === 'mineral_patch' ? 1500 : 40);
+                const def = UNIT_DEFS[entity.type] || {};
+                const maxHp = def.max_hp || def.hp || 100;
                 const hpPercent = entity.hp / maxHp;
 
                 if (hpPercent < 1.0 || entity.type !== 'mineral_patch') {

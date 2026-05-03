@@ -10,7 +10,7 @@ from rest_framework import viewsets, permissions
 from matches.models import Match
 from matches import serializers
 from matches.scenario import list_scenarios, run_scenario_from_file, SCENARIOS_DIR
-from matches.loader import load_map, get_maps_list
+from matches.loader import load_map, get_maps_list, UNIT_DEFINITIONS
 
 
 class MatchViewSet(viewsets.ModelViewSet):
@@ -31,10 +31,20 @@ class ReplayView(DetailView):
     template_name = 'matches/replay_visualizer.html'
     context_object_name = 'match'
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['unit_definitions'] = UNIT_DEFINITIONS
+        return context
+
 
 class MapEditorView(TemplateView):
     """Interactive map editor for designing layouts"""
     template_name = 'matches/map_editor.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['unit_definitions'] = UNIT_DEFINITIONS
+        return context
 
 
 def list_maps_api(request):
@@ -169,6 +179,7 @@ class ScenarioVisualizerView(TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['scenarios'] = list_scenarios()
+        context['unit_definitions'] = UNIT_DEFINITIONS
         return context
 
 
