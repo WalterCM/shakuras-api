@@ -1,28 +1,88 @@
-name: "Blood Bath"
-description: "Classic 2-player map with mineral patches"
+name: Blood Bath
+description: ''
 width: 64
 height: 64
-
 spawn_points:
-  p1: {x: 2, y: 6}
-  p2: {x: 53, y: 55}
-
+  p2:
+    x: 53
+    y: 55
+  p1:
+    x: 2
+    y: 6
 entities:
-  - id: m1
-    type: mineral_patch
-    owner: neutral
-    x: 0
-    y: 2
-  - id: m2
-    type: mineral_patch
-    owner: neutral
-    x: 1
-    y: 1
-  - id: m3
-    type: mineral_patch
-    owner: neutral
-    x: 4
-    y: 2
-
-config:
-  max_ticks: 500
+- id: m1
+  type: mineral_patch
+  owner: neutral
+  x: 0
+  y: 2
+- id: m2
+  type: mineral_patch
+  owner: neutral
+  x: 1
+  y: 1
+- id: m3
+  type: mineral_patch
+  owner: neutral
+  x: 4
+  y: 2
+- id: m4
+  type: mineral_patch
+  owner: neutral
+  x: 5
+  y: 1
+- id: m5
+  type: mineral_patch
+  owner: neutral
+  x: 7
+  y: 2
+- id: m6
+  type: mineral_patch
+  owner: neutral
+  x: 8
+  y: 1
+- id: m7
+  type: mineral_patch
+  owner: neutral
+  x: 9
+  y: 5
+- id: m8
+  type: mineral_patch
+  owner: neutral
+  x: 10
+  y: 4
+- id: m9
+  type: mineral_patch
+  owner: neutral
+  x: 53
+  y: 62
+- id: m10
+  type: mineral_patch
+  owner: neutral
+  x: 54
+  y: 61
+- id: m11
+  type: mineral_patch
+  owner: neutral
+  x: 57
+  y: 62
+- id: m12
+  type: mineral_patch
+  owner: neutral
+  x: 58
+  y: 61
+- id: m13
+  type: mineral_patch
+  owner: neutral
+  x: 61
+  y: 61
+- id: m14
+  type: mineral_patch
+  owner: neutral
+  x: 62
+  y: 60
+- id: m15
+  type: mineral_patch
+  owner: neutral
+  x: 61
+  y: 58
+reference_image: 400px-Blood_Bath.jpg

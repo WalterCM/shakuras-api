@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -20,515 +19,634 @@
             --p1-color: #f87171;
             --p2-color: #60a5fa;
         }
-
         body {
             font-family: 'Outfit', sans-serif;
             background-color: var(--bg-dark);
             color: var(--text-main);
             margin: 0;
-            display: flex;
             height: 100vh;
             overflow: hidden;
         }
 
-        /* Sidebar */
-        .sidebar {
-            width: 320px;
-            background: var(--bg-card);
-            border-right: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 24px;
-            display: flex;
-            flex-direction: column;
-            gap: 24px;
-            box-shadow: 4px 0 20px rgba(0, 0, 0, 0.3);
-            z-index: 10;
-        }
-
-        h1 {
-            font-size: 24px;
-            font-weight: 600;
-            margin: 0;
-            background: linear-gradient(135deg, #fff, var(--accent));
-            background-clip: text;
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .control-group {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        label {
-            font-size: 14px;
-            color: var(--text-dim);
-            font-weight: 400;
-        }
-
-        input[type="text"],
-        input[type="number"] {
-            background: rgba(15, 23, 42, 0.5);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 10px 14px;
-            border-radius: 8px;
-            color: white;
-            font-family: inherit;
-        }
-
-        .tools {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-        }
-
-        .tool-btn {
-            background: rgba(15, 23, 42, 0.5);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 12px;
-            border-radius: 10px;
-            color: var(--text-dim);
-            cursor: pointer;
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 6px;
-            font-size: 12px;
-        }
-
-        .tool-btn:hover {
-            border-color: var(--accent);
-            color: white;
-            background: rgba(56, 189, 248, 0.1);
-        }
-
-        .tool-btn.active {
-            border-color: var(--accent);
-            background: var(--accent);
-            color: var(--bg-dark);
-            font-weight: 600;
-            box-shadow: 0 0 15px var(--accent-glow);
-        }
-
-        .tool-btn .icon {
-            width: 24px;
-            height: 24px;
-            border-radius: 4px;
-        }
-
-        .btn-spawn-p1 .icon {
-            background: var(--p1-color);
-        }
-
-        .btn-spawn-p2 .icon {
-            background: var(--p2-color);
-        }
-
-        .btn-mineral .icon {
-            background: var(--mineral);
-            border-radius: 50%;
-        }
-
-        .btn-delete .icon {
-            background: var(--danger);
-        }
-
-        .save-btn {
-            margin-top: auto;
-            background: var(--accent);
-            color: var(--bg-dark);
-            border: none;
-            padding: 16px;
-            border-radius: 12px;
-            font-weight: 600;
-            font-size: 16px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .save-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px var(--accent-glow);
-        }
-
-        /* Editor Area */
-        .editor-container {
-            flex: 1;
-            position: relative;
-            background: #0b111e;
+        /* ===== Selection Screen ===== */
+        .selection-screen {
             display: flex;
             align-items: center;
             justify-content: center;
-            overflow: auto;
+            height: 100vh;
+        }
+        .selection-panel {
+            background: var(--bg-card);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 16px;
             padding: 40px;
+            width: 480px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
         }
+        .selection-panel h1 {
+            font-size: 28px; font-weight: 600; margin: 0 0 8px 0;
+            background: linear-gradient(135deg, #fff, var(--accent));
+            background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .selection-panel p { color: var(--text-dim); margin: 0 0 28px 0; font-size: 14px; }
+        .selection-actions { display: flex; flex-direction: column; gap: 12px; margin-bottom: 28px; }
+        .sel-btn {
+            background: rgba(15,23,42,0.5); border: 1px solid rgba(255,255,255,0.1);
+            padding: 16px 20px; border-radius: 12px; color: var(--text-main);
+            cursor: pointer; font-family: inherit; font-size: 15px; font-weight: 400;
+            text-align: left; transition: all 0.2s;
+        }
+        .sel-btn:hover { border-color: var(--accent); background: rgba(56,189,248,0.1); }
+        .sel-btn .sel-title { font-weight: 600; margin-bottom: 4px; }
+        .sel-btn .sel-desc { font-size: 12px; color: var(--text-dim); }
+        .sel-btn.primary { border-color: var(--accent); background: rgba(56,189,248,0.15); }
 
+        .map-list { display: flex; flex-direction: column; gap: 8px; }
+        .map-list-title { font-size: 13px; color: var(--text-dim); margin-bottom: 4px; }
+        .map-item {
+            background: rgba(15,23,42,0.5); border: 1px solid rgba(255,255,255,0.08);
+            padding: 12px 16px; border-radius: 10px; cursor: pointer;
+            display: flex; justify-content: space-between; align-items: center;
+            transition: all 0.2s; font-size: 14px;
+        }
+        .map-item:hover { border-color: var(--accent); background: rgba(56,189,248,0.08); }
+        .map-item .map-meta { font-size: 12px; color: var(--text-dim); }
+        .map-list-empty { color: var(--text-dim); font-size: 13px; font-style: italic; padding: 8px 0; }
+
+        /* ===== Editor ===== */
+        .editor-layout { display: flex; height: 100vh; }
+        .sidebar {
+            width: 320px; background: var(--bg-card);
+            border-right: 1px solid rgba(255,255,255,0.1);
+            padding: 24px; display: flex; flex-direction: column; gap: 20px;
+            box-shadow: 4px 0 20px rgba(0,0,0,0.3); z-index: 10; overflow-y: auto;
+        }
+        .sidebar h1 { font-size: 24px; font-weight: 600; margin: 0;
+            background: linear-gradient(135deg, #fff, var(--accent));
+            background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .back-link {
+            font-size: 12px; color: var(--text-dim); cursor: pointer;
+            text-decoration: underline; margin-top: -12px;
+        }
+        .back-link:hover { color: var(--accent); }
+        .control-group { display: flex; flex-direction: column; gap: 8px; }
+        label { font-size: 14px; color: var(--text-dim); font-weight: 400; }
+        input[type="text"], input[type="number"] {
+            background: rgba(15,23,42,0.5); border: 1px solid rgba(255,255,255,0.1);
+            padding: 10px 14px; border-radius: 8px; color: white; font-family: inherit;
+        }
+        .tools { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .tool-btn {
+            background: rgba(15,23,42,0.5); border: 1px solid rgba(255,255,255,0.1);
+            padding: 12px; border-radius: 10px; color: var(--text-dim); cursor: pointer;
+            transition: all 0.2s; display: flex; flex-direction: column;
+            align-items: center; gap: 6px; font-size: 12px;
+        }
+        .tool-btn:hover { border-color: var(--accent); color: white; background: rgba(56,189,248,0.1); }
+        .tool-btn.active {
+            border-color: var(--accent); background: var(--accent);
+            color: var(--bg-dark); font-weight: 600; box-shadow: 0 0 15px var(--accent-glow);
+        }
+        .tool-btn .icon { width: 24px; height: 24px; border-radius: 4px; }
+        .btn-spawn-p1 .icon { background: var(--p1-color); }
+        .btn-spawn-p2 .icon { background: var(--p2-color); }
+        .btn-mineral .icon { background: var(--mineral); border-radius: 50%; }
+        .btn-delete .icon { background: var(--danger); }
+        .save-btn {
+            margin-top: auto; background: var(--accent); color: var(--bg-dark); border: none;
+            padding: 16px; border-radius: 12px; font-weight: 600; font-size: 16px;
+            cursor: pointer; transition: all 0.2s;
+        }
+        .save-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px var(--accent-glow); }
+        .editor-container {
+            flex: 1; position: relative; background: #0b111e;
+            display: flex; align-items: center; justify-content: center;
+            overflow: auto; padding: 40px;
+        }
         #map-canvas {
-            background: #111827;
-            border: 2px solid #334155;
-            box-shadow: 0 0 100px rgba(0, 0, 0, 0.8), 0 0 20px rgba(56, 189, 248, 0.1);
-            image-rendering: pixelated;
-            cursor: crosshair;
+            background: #111827; border: 2px solid #334155;
+            box-shadow: 0 0 100px rgba(0,0,0,0.8), 0 0 20px rgba(56,189,248,0.1);
+            image-rendering: pixelated; cursor: crosshair;
         }
-
         .instructions {
-            position: absolute;
-            bottom: 24px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(15, 23, 42, 0.8);
-            backdrop-filter: blur(8px);
-            padding: 10px 20px;
-            border-radius: 20px;
-            font-size: 14px;
-            color: var(--text-dim);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
+            background: rgba(15,23,42,0.8); backdrop-filter: blur(8px);
+            padding: 10px 20px; border-radius: 20px; font-size: 14px;
+            color: var(--text-dim); border: 1px solid rgba(255,255,255,0.1);
         }
     </style>
 </head>
-
 <body>
+
+<!-- ===== SELECTION SCREEN ===== -->
+<div id="screen-select" class="selection-screen">
+    <div class="selection-panel">
+        <h1>Map Editor</h1>
+        <p>Create a new map or open an existing one to edit.</p>
+        <div class="selection-actions">
+            <button class="sel-btn primary" onclick="startNew()">
+                <div class="sel-title">+ New Map</div>
+                <div class="sel-desc">Start with a blank 64×64 canvas</div>
+            </button>
+        </div>
+        <div class="map-list-title">Existing Maps</div>
+        <div id="map-list" class="map-list">
+            <div class="map-list-empty">Loading...</div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== EDITOR SCREEN ===== -->
+<div id="screen-editor" class="editor-layout" style="display:none;">
     <div class="sidebar">
         <h1>Map Editor</h1>
+        <div class="back-link" onclick="backToSelect()">← Back to map list</div>
 
         <div class="control-group">
             <label>Map Name</label>
             <input type="text" id="map-name" value="New Arena">
         </div>
-
         <div class="control-group">
-            <label>Dimensions (Width x Height)</label>
+            <label>Dimensions (Width × Height)</label>
             <div style="display: flex; gap: 8px;">
-                <input type="number" id="map-width" value="128" min="32" max="512">
-                <input type="number" id="map-height" value="128" min="32" max="512">
+                <input type="number" id="map-width" value="64" min="32" max="512">
+                <input type="number" id="map-height" value="64" min="32" max="512">
             </div>
         </div>
-
         <div class="control-group">
-            <label>Zoom Level (<span id="zoom-val">4x</span>)</label>
-            <input type="range" id="zoom-slider" min="1" max="16" value="4" step="1">
+            <label>Zoom Level (<span id="zoom-val">400%</span>)</label>
+            <input type="range" id="zoom-slider" min="0.5" max="20" value="4" step="0.1">
         </div>
-
         <div class="control-group">
             <label>Placement Tools</label>
             <div class="tools">
                 <button class="tool-btn btn-spawn-p1 active" data-tool="spawn-p1">
-                    <div class="icon"></div>
-                    Spawn P1
+                    <div class="icon"></div> Spawn P1
                 </button>
                 <button class="tool-btn btn-spawn-p2" data-tool="spawn-p2">
-                    <div class="icon"></div>
-                    Spawn P2
+                    <div class="icon"></div> Spawn P2
                 </button>
                 <button class="tool-btn btn-mineral" data-tool="mineral">
-                    <div class="icon"></div>
-                    Mineral
+                    <div class="icon"></div> Mineral
                 </button>
                 <button class="tool-btn btn-delete" data-tool="delete">
-                    <div class="icon"></div>
-                    Delete
+                    <div class="icon"></div> Delete
                 </button>
             </div>
         </div>
-
-        <div id="stats"
-            style="font-size: 13px; color: var(--text-dim); display: flex; flex-direction: column; gap: 4px;">
+        <div id="stats" style="font-size: 13px; color: var(--text-dim); display: flex; flex-direction: column; gap: 4px;">
             <div>Minerals: <span id="count-minerals" style="color: var(--mineral); font-weight: 600;">0</span></div>
             <div>Spawns: <span id="count-spawns" style="color: var(--accent); font-weight: 600;">0/2</span></div>
             <div style="margin-top: 4px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 4px;">
                 Cursor: <span id="cursor-pos">0, 0</span>
             </div>
         </div>
-
         <div class="control-group">
             <label>Reference Image (Tracing)</label>
             <input type="file" id="ref-image-input" accept="image/*" style="font-size: 11px;">
             <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
                 <label style="flex-shrink: 0; font-size: 12px;">Opacity</label>
-                <input type="range" id="ref-opacity-slider" min="0" max="1" step="0.05" value="0.3"
-                    style="width: 100%;">
+                <input type="range" id="ref-opacity-slider" min="0" max="1" step="0.05" value="0.3" style="width: 100%;">
             </div>
-            <button id="clear-ref-btn"
-                style="background: rgba(239, 68, 68, 0.2); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.2); padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; margin-top: 4px; display: none;">Clear
-                Reference</button>
+            <button id="clear-ref-btn" style="background: rgba(239,68,68,0.2); color: #fca5a5; border: 1px solid rgba(239,68,68,0.2); padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; margin-top: 4px; display: none;">Clear Reference</button>
         </div>
-
         <button class="save-btn" id="save-btn">Save Map</button>
     </div>
-
     <div class="editor-container">
         <canvas id="map-canvas" width="512" height="512"></canvas>
-        <div class="instructions">
-            Left Click: Place/Pick | Mouse Wheel: Zoom (soon)
-        </div>
+        <div class="instructions">Left Click: Place/Pick | Mouse Wheel: Zoom (soon)</div>
     </div>
+</div>
 
-    <script>
-        const canvas = document.getElementById('map-canvas');
-        const ctx = canvas.getContext('2d');
-        const nameInput = document.getElementById('map-name');
-        const widthInput = document.getElementById('map-width');
-        const heightInput = document.getElementById('map-height');
-        const zoomSlider = document.getElementById('zoom-slider');
-        const zoomVal = document.getElementById('zoom-val');
-        const cursorInfo = document.getElementById('cursor-pos');
-        const saveBtn = document.getElementById('save-btn');
-        const toolBtns = document.querySelectorAll('.tool-btn');
+<script>
+    // ===== Selection Screen =====
+    async function loadMapList() {
+        try {
+            const res = await fetch('/matches/editor/maps/');
+            const data = await res.json();
+            const container = document.getElementById('map-list');
+            if (!data.maps || data.maps.length === 0) {
+                container.innerHTML = '<div class="map-list-empty">No maps found. Create one!</div>';
+                return;
+            }
+            container.innerHTML = data.maps.map(m =>
+                `<div class="map-item" onclick="openMap('${m.filename}')">
+                    <span>${m.name}</span>
+                    <span class="map-meta">${m.width}×${m.height}</span>
+                </div>`
+            ).join('');
+        } catch (e) {
+            document.getElementById('map-list').innerHTML = '<div class="map-list-empty">Error loading maps</div>';
+        }
+    }
 
-        let mapWidth = parseInt(widthInput.value);
-        let mapHeight = parseInt(heightInput.value);
-        let scale = 4; // Current visual multiplier
+    function startNew() {
+        currentFilename = null;
+        spawnPoints = {};
+        minerals = [];
+        document.getElementById('map-name').value = 'New Arena';
+        document.getElementById('map-width').value = 64;
+        document.getElementById('map-height').value = 64;
+        showEditor();
+    }
 
-        let currentTool = 'spawn-p1';
-        let spawnPoints = {};
-        let minerals = [];
-        let mousePos = { x: 0, y: 0 };
-
-        const TOOL_STATS = {
-            'spawn-p1': { width: 4, height: 3, color: 'rgba(248, 113, 113, 0.4)', solid: '#f87171' },
-            'spawn-p2': { width: 4, height: 3, color: 'rgba(96, 165, 250, 0.4)', solid: '#60a5fa' },
-            'mineral': { width: 2, height: 1, color: 'rgba(52, 211, 153, 0.4)', solid: '#34d399' },
-            'delete': { width: 1, height: 1, color: 'rgba(239, 68, 68, 0.4)' }
-        };
-
-        // UI Setup
-        toolBtns.forEach(btn => {
-            btn.addEventListener('click', () => {
-                toolBtns.forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                currentTool = btn.dataset.tool;
-            });
-        });
-
-        const updateInputs = () => {
-            mapWidth = parseInt(widthInput.value);
-            mapHeight = parseInt(heightInput.value);
-            scale = parseInt(zoomSlider.value);
-            zoomVal.textContent = scale + "x";
-
-            canvas.width = mapWidth * scale;
-            canvas.height = mapHeight * scale;
-            draw();
-        };
-
-        widthInput.addEventListener('change', updateInputs);
-        heightInput.addEventListener('change', updateInputs);
-        zoomSlider.addEventListener('input', updateInputs);
-
-        // Reference Image Logic
-        const refImageInput = document.getElementById('ref-image-input');
-        const refOpacitySlider = document.getElementById('ref-opacity-slider');
-        const clearRefBtn = document.getElementById('clear-ref-btn');
-        let refImage = null;
-        let refOpacity = 0.3;
-
-        refImageInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                const img = new Image();
-                img.onload = () => {
-                    refImage = img;
-                    clearRefBtn.style.display = 'block';
-                    draw();
-                };
-                img.src = event.target.result;
-            };
-            reader.readAsDataURL(file);
-        });
-
-        refOpacitySlider.addEventListener('input', (e) => {
-            refOpacity = parseFloat(e.target.value);
-            draw();
-        });
-
-        clearRefBtn.addEventListener('click', () => {
-            refImage = null;
-            refImageInput.value = '';
-            clearRefBtn.style.display = 'none';
-            draw();
-        });
-
-        // Interaction
-        canvas.addEventListener('mousemove', (e) => {
-            const rect = canvas.getBoundingClientRect();
-            mousePos.x = Math.floor((e.clientX - rect.left) / scale);
-            mousePos.y = Math.floor((e.clientY - rect.top) / scale);
-            cursorInfo.textContent = `${mousePos.x}, ${mousePos.y}`;
-            draw();
-        });
-
-        canvas.addEventListener('mousedown', (e) => {
-            const rect = canvas.getBoundingClientRect();
-            const x = Math.floor((e.clientX - rect.left) / scale);
-            const y = Math.floor((e.clientY - rect.top) / scale);
-
-            if (currentTool === 'spawn-p1') {
-                spawnPoints['p1'] = { x, y };
-            } else if (currentTool === 'spawn-p2') {
-                spawnPoints['p2'] = { x, y };
-            } else if (currentTool === 'mineral') {
-                minerals.push({ x, y });
-            } else if (currentTool === 'delete') {
-                // Delete logic: Check if clicked coordinate is inside any entity's area
-                minerals = minerals.filter(m => {
-                    const inX = x >= m.x && x < m.x + 2;
-                    const inY = y >= m.y && y < m.y + 1;
-                    return !(inX && inY);
+    async function openMap(filename) {
+        try {
+            const res = await fetch(`/matches/editor/load/?name=${filename}`);
+            const data = await res.json();
+            if (data.status !== 'ok') { alert('Error loading map'); return; }
+            const m = data.map;
+            document.getElementById('map-name').value = m.name || filename;
+            document.getElementById('map-width').value = m.width || 64;
+            document.getElementById('map-height').value = m.height || 64;
+            spawnPoints = m.spawn_points || {};
+            // Load minerals from entities list (new format)
+            minerals = [];
+            if (m.entities) {
+                m.entities.forEach(e => {
+                    if (e.type === 'mineral_patch') {
+                        minerals.push({ x: e.x, y: e.y });
+                    }
                 });
-                if (spawnPoints['p1']) {
-                    const inX = x >= spawnPoints['p1'].x && x < spawnPoints['p1'].x + 4;
-                    const inY = y >= spawnPoints['p1'].y && y < spawnPoints['p1'].y + 3;
-                    if (inX && inY) delete spawnPoints['p1'];
-                }
-                if (spawnPoints['p2']) {
-                    const inX = x >= spawnPoints['p2'].x && x < spawnPoints['p2'].x + 4;
-                    const inY = y >= spawnPoints['p2'].y && y < spawnPoints['p2'].y + 3;
-                    if (inX && inY) delete spawnPoints['p2'];
-                }
             }
-            draw();
-            updateStats();
+            // Legacy: also support old minerals list
+            if (m.minerals && m.minerals.length > 0 && minerals.length === 0) {
+                minerals = m.minerals.map(p => ({ x: p.x, y: p.y }));
+            }
+            
+            currentFilename = filename;
+            
+            // Load reference image if it exists
+            if (m.reference_image) {
+                loadRefImage(m.reference_image);
+            } else {
+                refImage = null;
+                refImageFilename = null;
+                clearRefBtn.style.display = 'none';
+            }
+            
+            showEditor();
+        } catch (e) {
+            alert('Failed to load map.');
+        }
+    }
+
+    function showEditor() {
+        document.getElementById('screen-select').style.display = 'none';
+        document.getElementById('screen-editor').style.display = 'flex';
+        updateInputs();
+        updateStats();
+    }
+
+    function backToSelect() {
+        document.getElementById('screen-editor').style.display = 'none';
+        document.getElementById('screen-select').style.display = 'flex';
+        loadMapList();
+    }
+
+    // ===== Editor =====
+    const canvas = document.getElementById('map-canvas');
+    const ctx = canvas.getContext('2d');
+    const nameInput = document.getElementById('map-name');
+    const widthInput = document.getElementById('map-width');
+    const heightInput = document.getElementById('map-height');
+    const zoomSlider = document.getElementById('zoom-slider');
+    const zoomVal = document.getElementById('zoom-val');
+    const cursorInfo = document.getElementById('cursor-pos');
+    const saveBtn = document.getElementById('save-btn');
+    const toolBtns = document.querySelectorAll('.tool-btn');
+
+    let mapWidth = parseInt(widthInput.value);
+    let mapHeight = parseInt(heightInput.value);
+    let scale = 4;
+    let currentTool = 'spawn-p1';
+    let currentFilename = null;
+    let spawnPoints = {};
+    let minerals = [];
+    let mousePos = { x: 0, y: 0 }; // Logical coordinates (on map)
+    
+    // View state
+    let viewX = 0; // Offset in pixels
+    let viewY = 0;
+    let isPanning = false;
+    let lastMousePos = { x: 0, y: 0 };
+
+    const TOOL_STATS = {
+        'spawn-p1': { width: 4, height: 3, color: 'rgba(248,113,113,0.4)', solid: '#f87171' },
+        'spawn-p2': { width: 4, height: 3, color: 'rgba(96,165,250,0.4)', solid: '#60a5fa' },
+        'mineral':  { width: 2, height: 1, color: 'rgba(52,211,153,0.4)', solid: '#34d399' },
+        'delete':   { width: 1, height: 1, color: 'rgba(239,68,68,0.4)' }
+    };
+
+    toolBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            toolBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentTool = btn.dataset.tool;
         });
+    });
 
-        const updateStats = () => {
-            document.getElementById('count-minerals').textContent = minerals.length;
-            document.getElementById('count-spawns').textContent = Object.keys(spawnPoints).length + "/2";
+    const updateInputs = () => {
+        mapWidth = parseInt(widthInput.value);
+        mapHeight = parseInt(heightInput.value);
+        scale = parseFloat(zoomSlider.value);
+        zoomVal.textContent = Math.round(scale * 100) + "%";
+        
+        // Match canvas size to container
+        const container = document.querySelector('.editor-container');
+        canvas.width = container.clientWidth;
+        canvas.height = container.clientHeight;
+        
+        draw();
+    };
+
+    window.addEventListener('resize', updateInputs);
+    widthInput.addEventListener('change', updateInputs);
+    heightInput.addEventListener('change', updateInputs);
+    zoomSlider.addEventListener('input', updateInputs);
+
+    // Reference Image (persisted to maps/references/)
+    const refImageInput = document.getElementById('ref-image-input');
+    const refOpacitySlider = document.getElementById('ref-opacity-slider');
+    const clearRefBtn = document.getElementById('clear-ref-btn');
+    let refImage = null;
+    let refImageFilename = null;  // persisted in YAML
+    let refOpacity = 0.3;
+
+    refImageInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        // Upload to server
+        const formData = new FormData();
+        formData.append('image', file);
+        try {
+            const res = await fetch('/matches/editor/reference/upload/', { method: 'POST', body: formData });
+            const data = await res.json();
+            if (data.status === 'ok') {
+                refImageFilename = data.filename;
+                loadRefImage(data.filename);
+            } else {
+                alert('Failed to upload reference image');
+            }
+        } catch (err) {
+            alert('Error uploading reference image');
+        }
+    });
+
+    function loadRefImage(filename) {
+        const img = new Image();
+        img.onload = () => {
+            refImage = img;
+            refImageFilename = filename;
+            clearRefBtn.style.display = 'block';
+            draw();
         };
+        img.onerror = () => { refImage = null; refImageFilename = null; };
+        img.src = `/matches/editor/reference/?name=${encodeURIComponent(filename)}`;
+    }
 
-        const draw = () => {
-            ctx.fillStyle = '#0f172a';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+    refOpacitySlider.addEventListener('input', (e) => { refOpacity = parseFloat(e.target.value); draw(); });
+    clearRefBtn.addEventListener('click', () => {
+        refImage = null;
+        refImageFilename = null;
+        refImageInput.value = '';
+        clearRefBtn.style.display = 'none';
+        draw();
+    });
 
-            // Draw Reference Image
-            if (refImage) {
-                ctx.globalAlpha = refOpacity;
-                ctx.drawImage(refImage, 0, 0, canvas.width, canvas.height);
-                ctx.globalAlpha = 1.0;
-            }
+    // Coordinate Conversion
+    function screenToWorld(sx, sy) {
+        return {
+            x: (sx - canvas.width / 2 - viewX) / scale,
+            y: (sy - canvas.height / 2 - viewY) / scale
+        };
+    }
 
-            // Minor Grid (Individual cells)
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            for (let x = 0; x <= mapWidth; x += 1) {
-                ctx.moveTo(x * scale, 0);
-                ctx.lineTo(x * scale, canvas.height);
-            }
-            for (let y = 0; y <= mapHeight; y += 1) {
-                ctx.moveTo(0, y * scale);
-                ctx.lineTo(canvas.width, y * scale);
-            }
-            ctx.stroke();
+    function worldToScreen(wx, wy) {
+        return {
+            x: wx * scale + viewX + canvas.width / 2,
+            y: wy * scale + viewY + canvas.height / 2
+        };
+    }
 
-            // Major Grid (8x8 cells)
-            ctx.strokeStyle = 'rgba(56, 189, 248, 0.15)';
-            ctx.lineWidth = 1.5;
-            ctx.beginPath();
-            for (let x = 0; x <= mapWidth; x += 8) {
-                ctx.moveTo(x * scale, 0);
-                ctx.lineTo(x * scale, canvas.height);
-            }
-            for (let y = 0; y <= mapHeight; y += 8) {
-                ctx.moveTo(0, y * scale);
-                ctx.lineTo(canvas.width, y * scale);
-            }
-            ctx.stroke();
+    // Canvas interaction
+    canvas.addEventListener('mousemove', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const sx = e.clientX - rect.left;
+        const sy = e.clientY - rect.top;
 
-            // Hover Highlight & Ghost
-            const tool = TOOL_STATS[currentTool];
-            if (tool) {
-                ctx.fillStyle = tool.color;
-                ctx.fillRect(mousePos.x * scale, mousePos.y * scale, tool.width * scale, tool.height * scale);
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-                ctx.lineWidth = 1;
-                ctx.strokeRect(mousePos.x * scale, mousePos.y * scale, tool.width * scale, tool.height * scale);
-            }
+        if (isPanning) {
+            viewX += sx - lastMousePos.x;
+            viewY += sy - lastMousePos.y;
+        } else {
+            const world = screenToWorld(sx, sy);
+            mousePos.x = Math.floor(world.x);
+            mousePos.y = Math.floor(world.y);
+            cursorInfo.textContent = `${mousePos.x}, ${mousePos.y}`;
+        }
+        
+        lastMousePos = { x: sx, y: sy };
+        draw();
+    });
 
-            // Cell Highlight (8x8)
-            const cellX = Math.floor(mousePos.x / 8) * 8;
-            const cellY = Math.floor(mousePos.y / 8) * 8;
-            ctx.strokeStyle = 'rgba(56, 189, 248, 0.3)';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(cellX * scale, cellY * scale, 8 * scale, 8 * scale);
+    canvas.addEventListener('mousedown', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const sx = e.clientX - rect.left;
+        const sy = e.clientY - rect.top;
+        
+        // Middle click or Space/Alt + Left click to pan
+        if (e.button === 1 || (e.button === 0 && (e.altKey || e.shiftKey))) {
+            isPanning = true;
+            lastMousePos = { x: sx, y: sy };
+            return;
+        }
 
-            // Minerals (2x1)
-            minerals.forEach(m => {
-                ctx.fillStyle = '#34d399';
-                ctx.fillRect(m.x * scale + 1, m.y * scale + 1, 2 * scale - 2, 1 * scale - 2);
-                ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
-                ctx.strokeRect(m.x * scale + 1, m.y * scale + 1, 2 * scale - 2, 1 * scale - 2);
-            });
+        const world = screenToWorld(sx, sy);
+        const x = Math.floor(world.x);
+        const y = Math.floor(world.y);
+        
+        // Boundary check (optional, but good for UX)
+        if (x < 0 || x >= mapWidth || y < 0 || y >= mapHeight) {
+            if (currentTool !== 'delete') return;
+        }
 
-            // Spawns (4x3)
+        if (currentTool === 'spawn-p1') {
+            spawnPoints['p1'] = { x, y };
+        } else if (currentTool === 'spawn-p2') {
+            spawnPoints['p2'] = { x, y };
+        } else if (currentTool === 'mineral') {
+            minerals.push({ x, y });
+        } else if (currentTool === 'delete') {
+            minerals = minerals.filter(m => !(x >= m.x && x < m.x + 2 && y >= m.y && y < m.y + 1));
             if (spawnPoints['p1']) {
                 const s = spawnPoints['p1'];
-                ctx.fillStyle = '#f87171';
-                ctx.fillRect(s.x * scale + 1, s.y * scale + 1, 4 * scale - 2, 3 * scale - 2);
-                ctx.strokeStyle = 'white';
-                ctx.lineWidth = 1;
-                ctx.strokeRect(s.x * scale + 1, s.y * scale + 1, 4 * scale - 2, 3 * scale - 2);
-
-                ctx.fillStyle = 'white';
-                ctx.font = `${Math.max(8, scale * 2)}px Outfit`;
-                ctx.fillText("P1", s.x * scale + 4, s.y * scale + Math.max(10, scale * 3));
+                if (x >= s.x && x < s.x + 4 && y >= s.y && y < s.y + 3) delete spawnPoints['p1'];
             }
             if (spawnPoints['p2']) {
                 const s = spawnPoints['p2'];
-                ctx.fillStyle = '#60a5fa';
-                ctx.fillRect(s.x * scale + 1, s.y * scale + 1, 4 * scale - 2, 3 * scale - 2);
-                ctx.strokeStyle = 'white';
-                ctx.lineWidth = 1;
-                ctx.strokeRect(s.x * scale + 1, s.y * scale + 1, 4 * scale - 2, 3 * scale - 2);
-
-                ctx.fillStyle = 'white';
-                ctx.font = `${Math.max(8, scale * 2)}px Outfit`;
-                ctx.fillText("P2", s.x * scale + 4, s.y * scale + Math.max(10, scale * 3));
+                if (x >= s.x && x < s.x + 4 && y >= s.y && y < s.y + 3) delete spawnPoints['p2'];
             }
-        };
+        }
+        draw();
+        updateStats();
+    });
 
-        saveBtn.addEventListener('click', async () => {
-            if (Object.keys(spawnPoints).length < 2) {
-                alert("Please place both Spawn P1 and Spawn P2.");
-                return;
-            }
+    window.addEventListener('mouseup', () => {
+        isPanning = false;
+    });
 
-            const payload = {
-                name: nameInput.value,
-                width: mapWidth,
-                height: mapHeight,
-                spawn_points: spawnPoints,
-                minerals: minerals
-            };
+    // Prevent context menu on right click if needed
+    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
-            saveBtn.disabled = true;
-            saveBtn.textContent = "Saving...";
+    // Zoom with wheel
+    canvas.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const sx = e.clientX - rect.left;
+        const sy = e.clientY - rect.top;
+        
+        const zoomSpeed = 0.1;
+        const delta = e.deltaY > 0 ? (1 / (1 + zoomSpeed)) : (1 + zoomSpeed);
+        
+        // Keep world position under mouse fixed
+        const worldBefore = screenToWorld(sx, sy);
+        
+        scale *= delta;
+        scale = Math.max(0.5, Math.min(scale, 40));
+        zoomSlider.value = scale;
+        zoomVal.textContent = Math.round(scale * 100) + "%";
+        
+        const worldAfter = screenToWorld(sx, sy);
+        viewX += (worldAfter.x - worldBefore.x) * scale;
+        viewY += (worldAfter.y - worldBefore.y) * scale;
+        
+        draw();
+    }, { passive: false });
 
-            try {
-                const response = await fetch('/matches/editor/save/', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                const result = await response.json();
-                if (result.status === 'ok') {
-                    alert("Map saved successfully!");
-                } else {
-                    alert("Error: " + result.message);
-                }
-            } catch (err) {
-                alert("Failed to save map.");
-            } finally {
-                saveBtn.disabled = false;
-                saveBtn.textContent = "Save Map";
-            }
+    const updateStats = () => {
+        document.getElementById('count-minerals').textContent = minerals.length;
+        document.getElementById('count-spawns').textContent = Object.keys(spawnPoints).length + "/2";
+    };
+
+    const draw = () => {
+        ctx.fillStyle = '#0b111e'; // Darker background for viewport
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.save();
+        // Centering transformation
+        ctx.translate(canvas.width / 2 + viewX, canvas.height / 2 + viewY);
+        ctx.scale(scale, scale);
+
+        // Map Background
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(0, 0, mapWidth, mapHeight);
+
+        if (refImage) {
+            ctx.globalAlpha = refOpacity;
+            ctx.drawImage(refImage, 0, 0, mapWidth, mapHeight);
+            ctx.globalAlpha = 1.0;
+        }
+
+        // Minor grid
+        ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+        ctx.lineWidth = 1 / scale;
+        ctx.beginPath();
+        for (let x = 0; x <= mapWidth; x++) { ctx.moveTo(x, 0); ctx.lineTo(x, mapHeight); }
+        for (let y = 0; y <= mapHeight; y++) { ctx.moveTo(0, y); ctx.lineTo(mapWidth, y); }
+        ctx.stroke();
+
+        // Major grid (8x8)
+        ctx.strokeStyle = 'rgba(56,189,248,0.15)';
+        ctx.lineWidth = 1.5 / scale;
+        ctx.beginPath();
+        for (let x = 0; x <= mapWidth; x += 8) { ctx.moveTo(x, 0); ctx.lineTo(x, mapHeight); }
+        for (let y = 0; y <= mapHeight; y += 8) { ctx.moveTo(0, y); ctx.lineTo(mapWidth, y); }
+        ctx.stroke();
+
+        // Hover ghost
+        const tool = TOOL_STATS[currentTool];
+        if (tool && !isPanning) {
+            ctx.fillStyle = tool.color;
+            ctx.fillRect(mousePos.x, mousePos.y, tool.width, tool.height);
+            ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+            ctx.lineWidth = 1 / scale;
+            ctx.strokeRect(mousePos.x, mousePos.y, tool.width, tool.height);
+        }
+
+        // Map boundary highlight
+        ctx.strokeStyle = '#334155';
+        ctx.lineWidth = 2 / scale;
+        ctx.strokeRect(0, 0, mapWidth, mapHeight);
+
+        // Minerals (2x1)
+        minerals.forEach(m => {
+            ctx.fillStyle = '#34d399';
+            ctx.fillRect(m.x + 0.05, m.y + 0.05, 1.9, 0.9);
+            ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+            ctx.lineWidth = 0.1 / scale;
+            ctx.strokeRect(m.x + 0.05, m.y + 0.05, 1.9, 0.9);
         });
 
-        // Init
-        updateInputs();
-    </script>
-</body>
+        // Spawns (4x3)
+        ['p1', 'p2'].forEach(pid => {
+            const s = spawnPoints[pid];
+            if (!s) return;
+            ctx.fillStyle = pid === 'p1' ? '#f87171' : '#60a5fa';
+            ctx.fillRect(s.x + 0.1, s.y + 0.1, 3.8, 2.8);
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 1 / scale;
+            ctx.strokeRect(s.x + 0.1, s.y + 0.1, 3.8, 2.8);
+            
+            ctx.fillStyle = 'white';
+            ctx.font = `${2}px Outfit`;
+            ctx.textAlign = "center";
+            ctx.fillText(pid.toUpperCase(), s.x + 2, s.y + 2);
+        });
 
+        ctx.restore();
+    };
+
+    // Save
+    saveBtn.addEventListener('click', async () => {
+        if (Object.keys(spawnPoints).length < 2) {
+            alert("Please place both Spawn P1 and Spawn P2.");
+            return;
+        }
+        const payload = {
+            filename: currentFilename,
+            name: nameInput.value,
+            width: mapWidth,
+            height: mapHeight,
+            spawn_points: spawnPoints,
+            minerals: minerals,
+            reference_image: refImageFilename || undefined
+        };
+        saveBtn.disabled = true;
+        saveBtn.textContent = "Saving...";
+        try {
+            const response = await fetch('/matches/editor/save/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const result = await response.json();
+            if (result.status === 'ok') {
+                alert("Map saved successfully!");
+            } else {
+                alert("Error: " + result.message);
+            }
+        } catch (err) {
+            alert("Failed to save map.");
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.textContent = "Save Map";
+        }
+    });
+
+    // Init
+    loadMapList();
+</script>
+</body>
 </html>

@@ -59,7 +59,8 @@ def create_engine_map_from_config(map_config):
         width=map_config.get('width', 128),
         height=map_config.get('height', 128),
         spawn_points=spawn_points,
-        minerals=[],  # Minerals now come from entities
+        minerals=[],
+        entities=map_config.get('entities', []),
     )
 
 

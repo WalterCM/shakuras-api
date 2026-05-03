@@ -8,7 +8,7 @@ from .actions import GatherAction, AttackAction, MoveAction, HoldAction
 
 class Map:
     """Stores static map data: dimensions, spawns, and terrain."""
-    def __init__(self, name="Default", width=128, height=128, spawn_points=None, minerals=None):
+    def __init__(self, name="Default", width=128, height=128, spawn_points=None, minerals=None, entities=None):
         self.name = name
         self.width = width
         self.height = height
@@ -17,8 +17,10 @@ class Map:
             'p1': Vector2D(10, 10),
             'p2': Vector2D(width - 10, height - 10)
         }
-        # List of {x, y} for mineral patches
+        # List of {x, y} for mineral patches (legacy format)
         self.minerals = minerals or []
+        # List of entity dicts from YAML (type, owner, x, y, id)
+        self.entities = entities or []
         # Placeholder for terrain (0 = walkable, 1 = obstacle)
         self.terrain = [[0 for _ in range(width)] for _ in range(height)]
 
@@ -379,6 +381,11 @@ class Entity:
         if self.type not in ['base', 'mineral_patch']:
             self._apply_repulsion(game_state)
 
+        # Boundary clamping: keep units inside the map
+        if hasattr(game_state, 'map_data'):
+            self.pos.x = max(0, min(self.pos.x, game_state.map_data.width))
+            self.pos.y = max(0, min(self.pos.y, game_state.map_data.height))
+
     def _apply_repulsion(self, game_state):
         """Pushes away from nearby entities to prevent overlapping"""
         if not hasattr(game_state, 'grid'):
@@ -561,15 +568,29 @@ class MatchSimulator:
                 entity.action = AttackAction(closest.id)
 
     def setup_match(self):
-        # 1. Minerals FIRST from Map data so workers can find them
+        # 1. Minerals FIRST so workers can find them when spawned
+        # Support both legacy format (map_data.minerals) and YAML entities
         for m in self.map_data.minerals:
-            # Support both dict {x, y} and Vector2D
             if hasattr(m, 'x'):
                 mx, my = m.x, m.y
             else:
                 mx, my = m['x'], m['y']
             patch = Entity('mineral_patch', 'neutral', mx, my)
-            # Center it: (x, y) from editor is top-left
+            patch.pos.x += patch.width / 2.0
+            patch.pos.y += patch.height / 2.0
+            self.add_entity(patch)
+
+        # Load mineral patches from YAML entities list
+        for ent_config in self.map_data.entities:
+            if ent_config.get('type') != 'mineral_patch':
+                continue
+            patch = Entity(
+                'mineral_patch',
+                ent_config.get('owner', 'neutral'),
+                ent_config.get('x', 0),
+                ent_config.get('y', 0),
+                entity_id=ent_config.get('id')
+            )
             patch.pos.x += patch.width / 2.0
             patch.pos.y += patch.height / 2.0
             self.add_entity(patch)
@@ -577,19 +598,16 @@ class MatchSimulator:
         # 2. Spawns (Bases)
         spawns = self.map_data.spawn_points
         for pid, pos in spawns.items():
-            # Support both dict {x, y} and Vector2D
             if hasattr(pos, 'x'):
                 px, py = pos.x, pos.y
             else:
                 px, py = pos['x'], pos['y']
             base = Entity('base', pid, px, py)
-            # Center it: (x, y) from editor is top-left
             base.pos.x += base.width / 2.0
             base.pos.y += base.height / 2.0
             self.add_entity(base)
             
             # 3. Initial workers near base (spawned AFTER minerals)
-            # Spawn them in a row below the base
             bx, by = base.pos.x, base.pos.y
             offsets = [(-1.5, 2.5), (-0.5, 2.5), (0.5, 2.5), (1.5, 2.5)] 
             for i in range(4):
