@@ -13,9 +13,9 @@ terran:
       minerals: 400
     build_time: 120
     sight: 10
-    can_produce: ["worker"]
+    can_produce: ["scv"]
   
-  worker:
+  scv:
     name: "SCV"
     category: "unit"
     hp: 60
@@ -103,8 +103,8 @@ neutral:
     width: 1
     height: 1
 
-  slow_worker:
-    name: "Slow Worker"
+  slow_scv:
+    name: "Slow scv"
     category: "unit"
     hp: 60
     damage: 5

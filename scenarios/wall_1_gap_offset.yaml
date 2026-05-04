@@ -2,8 +2,8 @@ name: Wall 1 gap offset left
 width: 64
 height: 64
 entities:
-- id: worker1
-  type: worker
+- id: scv1
+  type: scv
   owner: p1
   x: 14
   y: 30
@@ -104,7 +104,7 @@ entities:
   y: 37
 triggers:
 - tick: 0
-  entity: worker1
+  entity: scv1
   action:
     type: move
     target:

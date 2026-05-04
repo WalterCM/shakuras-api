@@ -10,7 +10,7 @@ class EntityEdgeCaseTests(TestCase):
 
     def test_zero_hp_entity_no_negative(self):
         """Test that HP doesn't go negative"""
-        entity = Entity('worker', 'p1', 10, 10)
+        entity = Entity('scv', 'p1', 10, 10)
         entity.take_damage(1000)
         
         self.assertEqual(entity.hp, 0)

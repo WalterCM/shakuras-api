@@ -117,7 +117,7 @@ class EngineCoreTests(TestCase):
 
     def test_entity_movement(self):
         """Verify pos updates correctly in 'move' state"""
-        entity = Entity('worker', 'p1', 0, 0)
+        entity = Entity('scv', 'p1', 0, 0)
         entity.action = MoveAction(Vector2D(10, 10))
         
         # Speed is 1.8, so it should move towards (10,10)
@@ -198,17 +198,17 @@ class EngineCoreTests(TestCase):
                     self.assertNotIn('owner_id', entity_delta)
 
     def test_harvest_income(self):
-        """Verify that a worker only deposits minerals at a base after mining"""
+        """Verify that a scv only deposits minerals at a base after mining"""
         player1 = Player.objects.create(nickname='P1')
         player2 = Player.objects.create(nickname='P2')
         
-        worker = Entity('worker', 'p1', 0, 0)
-        patch = Entity('mineral_patch', 'neutral', 5, 0) # Close to worker
+        scv = Entity('scv', 'p1', 0, 0)
+        patch = Entity('mineral_patch', 'neutral', 5, 0) # Close to scv
         base = Entity('base', 'p1', 10, 0)
         
         class MockGameState:
             def __init__(self, resources):
-                self.entities = {patch.id: patch, worker.id: worker, base.id: base}
+                self.entities = {patch.id: patch, scv.id: scv, base.id: base}
                 self.resources = resources
                 self.grid = SpatialGrid(128, 128)
             def add_minerals(self, pid, amount):
@@ -217,44 +217,44 @@ class EngineCoreTests(TestCase):
         resources = {'p1': 50.0}
         gs = MockGameState(resources)
         
-        worker.action = GatherAction(patch.id)
+        scv.action = GatherAction(patch.id)
         
         # 1. Move to patch and mine
-        # Run until worker reaches patch and starts mining
+        # Run until scv reaches patch and starts mining
         for _ in range(10):
-            worker.update(gs)
-            if worker.get_current_status() == 'mining':
+            scv.update(gs)
+            if scv.get_current_status() == 'mining':
                 break
         
-        # Continue mining until worker picks up minerals (takes ~30 ticks)
+        # Continue mining until scv picks up minerals (takes ~30 ticks)
         for _ in range(35):
-            worker.update(gs)
-            if worker.carrying > 0:
+            scv.update(gs)
+            if scv.carrying > 0:
                 break
             
         # Should now be carrying minerals and in 'return' state
-        self.assertEqual(worker.carrying, worker.harvest_amount)
-        self.assertEqual(worker.get_current_status(), 'return')
+        self.assertEqual(scv.carrying, scv.harvest_amount)
+        self.assertEqual(scv.get_current_status(), 'return')
         self.assertEqual(resources['p1'], 50.0) # Not deposited yet!
 
         # 2. Return trip
-        while worker.get_current_status() == 'return':
-            worker.update(gs)
+        while scv.get_current_status() == 'return':
+            scv.update(gs)
             
         # Should have deposited
-        self.assertEqual(resources['p1'], 50.0 + worker.harvest_amount)
-        self.assertEqual(worker.carrying, 0)
-        self.assertEqual(worker.get_current_status(), 'harvest')
+        self.assertEqual(resources['p1'], 50.0 + scv.harvest_amount)
+        self.assertEqual(scv.carrying, 0)
+        self.assertEqual(scv.get_current_status(), 'harvest')
 
     def test_interrupted_trip(self):
-        """Verify that killing a worker carrying minerals drops them"""
-        worker = Entity('worker', 'p1', 0, 0)
-        worker.carrying = 8
-        worker.get_current_status() # Initialize action if any
+        """Verify that killing a scv carrying minerals drops them"""
+        scv = Entity('scv', 'p1', 0, 0)
+        scv.carrying = 8
+        scv.get_current_status() # Initialize action if any
         
-        worker.take_damage(60) # Death (SCV has 60 HP)
-        self.assertEqual(worker.get_current_status(), 'dead')
-        self.assertEqual(worker.carrying, 0)
+        scv.take_damage(60) # Death (SCV has 60 HP)
+        self.assertEqual(scv.get_current_status(), 'dead')
+        self.assertEqual(scv.carrying, 0)
 
     def test_unit_production_spending(self):
         """Verify minerals are deducted when queuing a unit"""
@@ -303,8 +303,8 @@ class EngineCoreTests(TestCase):
 
     def test_collision_repulsion(self):
         """Verify that overlapping units push each other apart"""
-        u1 = Entity('worker', 'p1', 10, 10)
-        u2 = Entity('worker', 'p1', 10.1, 10.1) # Extreme overlap
+        u1 = Entity('scv', 'p1', 10, 10)
+        u2 = Entity('scv', 'p1', 10.1, 10.1) # Extreme overlap
         
         class MockGameState:
             def __init__(self):

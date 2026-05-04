@@ -22,18 +22,18 @@ class MockGameState:
         else:
             self.nav_grid.set_dynamic_rect(entity.pos.x, entity.pos.y, entity.width, entity.height, entity.id)
 
-    def run_simulation(self, worker, target_pos, max_ticks=100, sample_every=10, dist_check=0.1):
+    def run_simulation(self, scv, target_pos, max_ticks=100, sample_every=10, dist_check=0.1):
         """Run simulation and collect path data."""
         path = []
         directions_tried = set()
-        last_pos = worker.pos.copy()
+        last_pos = scv.pos.copy()
         tick_at_direction = {}
         
         for tick in range(max_ticks):
             # Track direction changes
-            if worker.pos.dist_to(last_pos) > dist_check:
-                dx = worker.pos.x - last_pos.x
-                dy = worker.pos.y - last_pos.y
+            if scv.pos.dist_to(last_pos) > dist_check:
+                dx = scv.pos.x - last_pos.x
+                dy = scv.pos.y - last_pos.y
                 if abs(dx) > abs(dy):
                     direction = 'horizontal'
                 else:
@@ -41,11 +41,11 @@ class MockGameState:
                 if direction not in directions_tried:
                     directions_tried.add(direction)
                     tick_at_direction[direction] = tick
-                last_pos = worker.pos.copy()
+                last_pos = scv.pos.copy()
             
             # Sample path
             if tick % sample_every == 0:
-                path.append((tick, worker.pos.x, worker.pos.y))
+                path.append((tick, scv.pos.x, scv.pos.y))
             
             # Refresh dynamic grid
             self.nav_grid.clear_dynamic()
@@ -53,16 +53,16 @@ class MockGameState:
                 if ent.type not in ['base', 'mineral_patch', 'building']:
                     self.nav_grid.set_dynamic(ent.pos.x, ent.pos.y, ent.id)
             
-            worker.update(self)
+            scv.update(self)
             
             # Check if reached target
-            if worker.pos.dist_to(target_pos) < 2:
-                path.append((tick + 1, worker.pos.x, worker.pos.y))
+            if scv.pos.dist_to(target_pos) < 2:
+                path.append((tick + 1, scv.pos.x, scv.pos.y))
                 break
         
         return {
             'path': path,
-            'final_pos': (worker.pos.x, worker.pos.y),
+            'final_pos': (scv.pos.x, scv.pos.y),
             'directions_tried': directions_tried,
             'tick_at_direction': tick_at_direction,
             'final_tick': tick
@@ -95,13 +95,13 @@ class NavigationTests(TestCase):
         start_pos = Vector2D(10, 10)
         target_pos = Vector2D(50, 10)
         
-        worker = Entity('worker', 'p1', start_pos.x, start_pos.y)
-        worker.action = MoveAction(target_pos)
-        gs._spawn_entity(worker)
+        scv = Entity('scv', 'p1', start_pos.x, start_pos.y)
+        scv.action = MoveAction(target_pos)
+        gs._spawn_entity(scv)
         
-        result = gs.run_simulation(worker, target_pos, self.max_ticks, self.sample_every)
+        result = gs.run_simulation(scv, target_pos, self.max_ticks, self.sample_every)
         
-        reached = worker.pos.dist_to(target_pos) < 2
+        reached = scv.pos.dist_to(target_pos) < 2
         passed = reached
         
         print(f"\n=== test_1_baseline_open_field ===")
@@ -112,7 +112,7 @@ class NavigationTests(TestCase):
         print(f"final_pos: {result['final_pos']}")
         print(f"final_tick: {result['final_tick']}")
         
-        self.assertTrue(passed, f"Worker should reach target. Final pos: {result['final_pos']}")
+        self.assertTrue(passed, f"scv should reach target. Final pos: {result['final_pos']}")
 
     def test_2_solid_wall_slide(self):
         """Test: Solid wall - unit should slide around it."""
@@ -124,14 +124,14 @@ class NavigationTests(TestCase):
         start_pos = Vector2D(10, 15)
         target_pos = Vector2D(50, 15)
         
-        worker = Entity('worker', 'p1', start_pos.x, start_pos.y)
-        worker.action = MoveAction(target_pos)
-        gs._spawn_entity(worker)
+        scv = Entity('scv', 'p1', start_pos.x, start_pos.y)
+        scv.action = MoveAction(target_pos)
+        gs._spawn_entity(scv)
         
-        result = gs.run_simulation(worker, target_pos, self.max_ticks, self.sample_every)
+        result = gs.run_simulation(scv, target_pos, self.max_ticks, self.sample_every)
         
         final_x, final_y = result['final_pos']
-        # Worker should at least slide (move perpendicular to target direction)
+        # scv should at least slide (move perpendicular to target direction)
         # Target is horizontal (left->right), so sliding means vertical movement
         moved_vertically = abs(final_y - start_pos.y) > 1
         reached_or_slid = final_x > 25 or moved_vertically
@@ -147,7 +147,7 @@ class NavigationTests(TestCase):
         print(f"final_pos: {result['final_pos']}")
         print(f"vertical_movement: {abs(final_y - start_pos.y)}")
         
-        self.assertTrue(passed, f"Worker should slide or reach target. Final pos: {result['final_pos']}")
+        self.assertTrue(passed, f"scv should slide or reach target. Final pos: {result['final_pos']}")
 
     def test_3_gap_center(self):
         """Test: Wall with gap at center - unit should use gap."""
@@ -161,11 +161,11 @@ class NavigationTests(TestCase):
         start_pos = Vector2D(10, 15)
         target_pos = Vector2D(50, 15)
         
-        worker = Entity('worker', 'p1', start_pos.x, start_pos.y)
-        worker.action = MoveAction(target_pos)
-        gs._spawn_entity(worker)
+        scv = Entity('scv', 'p1', start_pos.x, start_pos.y)
+        scv.action = MoveAction(target_pos)
+        gs._spawn_entity(scv)
         
-        result = gs.run_simulation(worker, target_pos, self.max_ticks, self.sample_every)
+        result = gs.run_simulation(scv, target_pos, self.max_ticks, self.sample_every)
         
         final_x = result['final_pos'][0]
         passed = final_x > 32  # Passed through gap
@@ -178,7 +178,7 @@ class NavigationTests(TestCase):
         print(f"target_pos: {target_pos.x}, {target_pos.y}")
         print(f"final_pos: {result['final_pos']}")
         
-        self.assertTrue(passed, f"Worker should use gap at center. Final pos: {result['final_pos']}")
+        self.assertTrue(passed, f"scv should use gap at center. Final pos: {result['final_pos']}")
 
     def test_4_gap_left_offset(self):
         """Test: Wall with gap offset to the left - unit should find it."""
@@ -191,11 +191,11 @@ class NavigationTests(TestCase):
         start_pos = Vector2D(10, 15)
         target_pos = Vector2D(50, 15)
         
-        worker = Entity('worker', 'p1', start_pos.x, start_pos.y)
-        worker.action = MoveAction(target_pos)
-        gs._spawn_entity(worker)
+        scv = Entity('scv', 'p1', start_pos.x, start_pos.y)
+        scv.action = MoveAction(target_pos)
+        gs._spawn_entity(scv)
         
-        result = gs.run_simulation(worker, target_pos, self.max_ticks, self.sample_every)
+        result = gs.run_simulation(scv, target_pos, self.max_ticks, self.sample_every)
         
         final_x = result['final_pos'][0]
         passed = final_x > 32
@@ -208,7 +208,7 @@ class NavigationTests(TestCase):
         print(f"target_pos: {target_pos.x}, {target_pos.y}")
         print(f"final_pos: {result['final_pos']}")
         
-        self.assertTrue(passed, f"Worker should use gap at y=14. Final pos: {result['final_pos']}")
+        self.assertTrue(passed, f"scv should use gap at y=14. Final pos: {result['final_pos']}")
 
     def test_5_gap_right_offset(self):
         """Test: Wall with gap offset to the right - unit should find it."""
@@ -221,11 +221,11 @@ class NavigationTests(TestCase):
         start_pos = Vector2D(10, 15)
         target_pos = Vector2D(50, 15)
         
-        worker = Entity('worker', 'p1', start_pos.x, start_pos.y)
-        worker.action = MoveAction(target_pos)
-        gs._spawn_entity(worker)
+        scv = Entity('scv', 'p1', start_pos.x, start_pos.y)
+        scv.action = MoveAction(target_pos)
+        gs._spawn_entity(scv)
         
-        result = gs.run_simulation(worker, target_pos, self.max_ticks, self.sample_every)
+        result = gs.run_simulation(scv, target_pos, self.max_ticks, self.sample_every)
         
         final_x = result['final_pos'][0]
         passed = final_x > 32
@@ -238,7 +238,7 @@ class NavigationTests(TestCase):
         print(f"target_pos: {target_pos.x}, {target_pos.y}")
         print(f"final_pos: {result['final_pos']}")
         
-        self.assertTrue(passed, f"Worker should use gap at y=16. Final pos: {result['final_pos']}")
+        self.assertTrue(passed, f"scv should use gap at y=16. Final pos: {result['final_pos']}")
 
     def test_6_two_gaps(self):
         """Test: Wall with two gaps - unit should use nearest."""
@@ -253,11 +253,11 @@ class NavigationTests(TestCase):
         start_pos = Vector2D(10, 15)
         target_pos = Vector2D(50, 15)
         
-        worker = Entity('worker', 'p1', start_pos.x, start_pos.y)
-        worker.action = MoveAction(target_pos)
-        gs._spawn_entity(worker)
+        scv = Entity('scv', 'p1', start_pos.x, start_pos.y)
+        scv.action = MoveAction(target_pos)
+        gs._spawn_entity(scv)
         
-        result = gs.run_simulation(worker, target_pos, self.max_ticks, self.sample_every)
+        result = gs.run_simulation(scv, target_pos, self.max_ticks, self.sample_every)
         
         final_x = result['final_pos'][0]
         passed = final_x > 32
@@ -270,14 +270,14 @@ class NavigationTests(TestCase):
         print(f"target_pos: {target_pos.x}, {target_pos.y}")
         print(f"final_pos: {result['final_pos']}")
         
-        self.assertTrue(passed, f"Worker should use nearest gap. Final pos: {result['final_pos']}")
+        self.assertTrue(passed, f"scv should use nearest gap. Final pos: {result['final_pos']}")
 
     def test_7_l_shape_corner(self):
         """Test: L-shaped wall - unit should follow corner out (with escape path)."""
         gs = MockGameState(self.width, self.height)
         
         # L-shape with gap: vertical wall at x=30, y=10-25, horizontal wall at y=20, x=20-30
-        # But leave a gap at the corner so worker can escape
+        # But leave a gap at the corner so scv can escape
         # Vertical wall: y=10-20 (gap at y=20+)
         self._create_vertical_wall(gs, 30, 10, 20)
         # Horizontal wall: x=20-29 (gap at x=30)
@@ -286,11 +286,11 @@ class NavigationTests(TestCase):
         start_pos = Vector2D(25, 15)
         target_pos = Vector2D(50, 25)
         
-        worker = Entity('worker', 'p1', start_pos.x, start_pos.y)
-        worker.action = MoveAction(target_pos)
-        gs._spawn_entity(worker)
+        scv = Entity('scv', 'p1', start_pos.x, start_pos.y)
+        scv.action = MoveAction(target_pos)
+        gs._spawn_entity(scv)
         
-        result = gs.run_simulation(worker, target_pos, self.max_ticks, self.sample_every)
+        result = gs.run_simulation(scv, target_pos, self.max_ticks, self.sample_every)
         
         final_x, final_y = result['final_pos']
         # Should make progress toward target (past the corner area)
@@ -303,7 +303,7 @@ class NavigationTests(TestCase):
         print(f"target_pos: {target_pos.x}, {target_pos.y}")
         print(f"final_pos: {result['final_pos']}")
         
-        self.assertTrue(passed, f"Worker should navigate L-shape. Final pos: {result['final_pos']}")
+        self.assertTrue(passed, f"scv should navigate L-shape. Final pos: {result['final_pos']}")
 
     def test_8_narrow_gap_float(self):
         """Test: Gap at float position (1 tile wide) - unit should use it."""
@@ -320,11 +320,11 @@ class NavigationTests(TestCase):
         start_pos = Vector2D(10, 15)
         target_pos = Vector2D(50, 15)
     
-        worker = Entity('worker', 'p1', start_pos.x, start_pos.y)
-        worker.action = MoveAction(target_pos)
-        gs._spawn_entity(worker)
+        scv = Entity('scv', 'p1', start_pos.x, start_pos.y)
+        scv.action = MoveAction(target_pos)
+        gs._spawn_entity(scv)
     
-        result = gs.run_simulation(worker, target_pos, self.max_ticks, self.sample_every)
+        result = gs.run_simulation(scv, target_pos, self.max_ticks, self.sample_every)
     
         # Check: made it past wall (x=30)
         passed = result['final_pos'][0] > 35
@@ -337,7 +337,7 @@ class NavigationTests(TestCase):
         print(f"target_pos: {target_pos.x}, {target_pos.y}")
         print(f"final_pos: {result['final_pos']}")
     
-        self.assertTrue(passed, f"Worker should navigate float gap. Final pos: {result['final_pos']}")
+        self.assertTrue(passed, f"scv should navigate float gap. Final pos: {result['final_pos']}")
 
     def test_9_too_narrow_gap(self):
         """Test: Gap smaller than unit - should treat as solid wall."""
@@ -357,20 +357,20 @@ class NavigationTests(TestCase):
         start_pos = Vector2D(10, 15)
         target_pos = Vector2D(50, 15)
         
-        worker = Entity('worker', 'p1', start_pos.x, start_pos.y)
-        worker.action = MoveAction(target_pos)
-        gs._spawn_entity(worker)
+        scv = Entity('scv', 'p1', start_pos.x, start_pos.y)
+        scv.action = MoveAction(target_pos)
+        gs._spawn_entity(scv)
         
-        result = gs.run_simulation(worker, target_pos, self.max_ticks, self.sample_every)
+        result = gs.run_simulation(scv, target_pos, self.max_ticks, self.sample_every)
         
         final_x = result['final_pos'][0]
-        # The wall has a gap but it's very small - the worker may or may not pass
+        # The wall has a gap but it's very small - the scv may or may not pass
         # depending on how we handle narrow gaps
         # For this test, we'll accept either behavior
-        # If worker passes, good. If not, also ok (slid around)
+        # If scv passes, good. If not, also ok (slid around)
         not_through = final_x <= 32
         
-        # Alternative: accept if worker made any vertical progress (slid)
+        # Alternative: accept if scv made any vertical progress (slid)
         if final_x > 32:
             # Check if it slid vertically
             vertical_moved = abs(result['final_pos'][1] - start_pos.y) > 1
@@ -384,7 +384,7 @@ class NavigationTests(TestCase):
         print(f"target_pos: {target_pos.x}, {target_pos.y}")
         print(f"final_pos: {result['final_pos']}")
         
-        self.assertTrue(not_through, f"Worker should treat too-narrow gap as solid. Final pos: {result['final_pos']}")
+        self.assertTrue(not_through, f"scv should treat too-narrow gap as solid. Final pos: {result['final_pos']}")
 
     def test_10_square_trap(self):
         """Test: Fully enclosed - unit tries directions then stops."""
@@ -403,11 +403,11 @@ class NavigationTests(TestCase):
         start_pos = Vector2D(12.5, 12.5)
         target_pos = Vector2D(50, 50)
         
-        worker = Entity('slow_worker', 'p1', start_pos.x, start_pos.y)
-        worker.action = MoveAction(target_pos)
-        gs._spawn_entity(worker)
+        scv = Entity('slow_scv', 'p1', start_pos.x, start_pos.y)
+        scv.action = MoveAction(target_pos)
+        gs._spawn_entity(scv)
         
-        result = gs.run_simulation(worker, target_pos, self.max_ticks, self.sample_every, dist_check=0.05)
+        result = gs.run_simulation(scv, target_pos, self.max_ticks, self.sample_every, dist_check=0.05)
         
         # Check: tried at least 2 directions (horizontal and vertical)
         # Note: With current sliding, it will only try one axis at a time
@@ -426,4 +426,4 @@ class NavigationTests(TestCase):
         print(f"final_pos: {result['final_pos']}")
         print(f"final_tick: {result['final_tick']}")
         
-        self.assertTrue(passed, f"Worker should try directions. Tried: {result['directions_tried']}")
+        self.assertTrue(passed, f"scv should try directions. Tried: {result['directions_tried']}")

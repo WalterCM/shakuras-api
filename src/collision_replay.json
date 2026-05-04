@@ -451,7 +451,7 @@
         "status": "idle",
         "carrying": 0,
         "prod_queue": [
-          "worker"
+          "scv"
         ],
         "prod_progress": 0,
         "radius": 2.5,
@@ -460,7 +460,7 @@
       },
       {
         "id": "957527f4",
-        "type": "worker",
+        "type": "scv",
         "owner_id": "p1",
         "x": 10.5,
         "y": 14.0,
@@ -475,7 +475,7 @@
       },
       {
         "id": "cdd2e468",
-        "type": "worker",
+        "type": "scv",
         "owner_id": "p1",
         "x": 11.5,
         "y": 14.0,
@@ -490,7 +490,7 @@
       },
       {
         "id": "d3f81f5e",
-        "type": "worker",
+        "type": "scv",
         "owner_id": "p1",
         "x": 12.5,
         "y": 14.0,
@@ -505,7 +505,7 @@
       },
       {
         "id": "cb28df46",
-        "type": "worker",
+        "type": "scv",
         "owner_id": "p1",
         "x": 13.5,
         "y": 14.0,
@@ -535,7 +535,7 @@
       },
       {
         "id": "d790fa43",
-        "type": "worker",
+        "type": "scv",
         "owner_id": "p2",
         "x": 118.5,
         "y": 122.0,
@@ -550,7 +550,7 @@
       },
       {
         "id": "f6869818",
-        "type": "worker",
+        "type": "scv",
         "owner_id": "p2",
         "x": 119.5,
         "y": 122.0,
@@ -565,7 +565,7 @@
       },
       {
         "id": "ddbeaf00",
-        "type": "worker",
+        "type": "scv",
         "owner_id": "p2",
         "x": 120.5,
         "y": 122.0,
@@ -580,7 +580,7 @@
       },
       {
         "id": "704122ca",
-        "type": "worker",
+        "type": "scv",
         "owner_id": "p2",
         "x": 121.5,
         "y": 122.0,
@@ -595,7 +595,7 @@
       },
       {
         "id": "5286603f",
-        "type": "worker",
+        "type": "scv",
         "owner_id": "p1",
         "x": 23.0,
         "y": 23.0,
@@ -610,7 +610,7 @@
       },
       {
         "id": "a9cb0e95",
-        "type": "worker",
+        "type": "scv",
         "owner_id": "p1",
         "x": 50.0,
         "y": 50.0,
@@ -625,7 +625,7 @@
       },
       {
         "id": "d2239b6d",
-        "type": "worker",
+        "type": "scv",
         "owner_id": "p1",
         "x": 80.0,
         "y": 48.0,
@@ -640,7 +640,7 @@
       },
       {
         "id": "37f8230d",
-        "type": "worker",
+        "type": "scv",
         "owner_id": "p1",
         "x": 80.0,
         "y": 49.0,
@@ -655,7 +655,7 @@
       },
       {
         "id": "56f9ab60",
-        "type": "worker",
+        "type": "scv",
         "owner_id": "p1",
         "x": 80.0,
         "y": 50.0,
@@ -670,7 +670,7 @@
       },
       {
         "id": "4145a6a8",
-        "type": "worker",
+        "type": "scv",
         "owner_id": "p1",
         "x": 80.0,
         "y": 51.0,
@@ -685,7 +685,7 @@
       },
       {
         "id": "a29f76f8",
-        "type": "worker",
+        "type": "scv",
         "owner_id": "p1",
         "x": 80.0,
         "y": 52.0,
@@ -1587,7 +1587,7 @@
       },
       {
         "id": "b3c86120",
-        "type": "worker",
+        "type": "scv",
         "owner_id": "p1",
         "x": 12.0,
         "y": 15.5,
@@ -1602,7 +1602,7 @@
       },
       {
         "id": "48bbdb33",
-        "type": "worker",
+        "type": "scv",
         "owner_id": "p2",
         "x": 120.0,
         "y": 123.5,
@@ -4737,7 +4737,7 @@
       },
       {
         "id": "f6a0e862",
-        "type": "worker",
+        "type": "scv",
         "owner_id": "p1",
         "x": 12.0,
         "y": 15.5,
@@ -5964,7 +5964,7 @@
       },
       {
         "id": "78f1f766",
-        "type": "worker",
+        "type": "scv",
         "owner_id": "p1",
         "x": 12.0,
         "y": 15.5,

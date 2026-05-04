@@ -2,8 +2,8 @@ name: Wall 2 gaps
 width: 64
 height: 64
 entities:
-- id: worker1
-  type: worker
+- id: scv1
+  type: scv
   owner: p1
   x: 10
   y: 37
@@ -99,7 +99,7 @@ entities:
   y: 42
 triggers:
 - tick: 0
-  entity: worker1
+  entity: scv1
   action:
     type: move
     target:

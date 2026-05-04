@@ -158,7 +158,7 @@ class GatherAction(Action):
             # Keep moving
             entity.move_towards(closest_base.pos, game_state)
     def _find_best_patch(self, entity, game_state, max_dist=30.0, only_unoccupied=False):
-        """Find the best mineral patch considering distance and current worker assignments"""
+        """Find the best mineral patch considering distance and current scv assignments"""
         patches = [e for e in game_state.entities.values()
                   if e.type == 'mineral_patch' and e.hp > 0]
         
@@ -172,7 +172,7 @@ class GatherAction(Action):
         # Count current assignments
         assigned_counts = {}
         for other in game_state.entities.values():
-            if other.owner_id == entity.owner_id and other.type == 'worker' and isinstance(other.action, GatherAction):
+            if other.owner_id == entity.owner_id and other.type == 'scv' and isinstance(other.action, GatherAction):
                 tid = other.action.target_patch_id
                 assigned_counts[tid] = assigned_counts.get(tid, 0) + 1
         

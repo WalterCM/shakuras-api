@@ -12,7 +12,7 @@ class MovementAndCollisionTests(TestCase):
 
     def test_move_to_same_position(self):
         """Test moving to current position"""
-        entity = Entity('worker', 'p1', 10, 10)
+        entity = Entity('scv', 'p1', 10, 10)
         entity.action = MoveAction(Vector2D(10, 10))
         
         class MockGameState:
@@ -30,26 +30,26 @@ class MovementAndCollisionTests(TestCase):
 
     def test_entity_radius_collision(self):
         """Test that entities with different radii collide correctly"""
-        # Marine (radius 0.5) and Worker (radius 0.5)
+        # Marine (radius 0.5) and scv (radius 0.5)
         marine = Entity('marine', 'p1', 10, 10)
-        worker = Entity('worker', 'p1', 10.5, 10)  # Very close
+        scv = Entity('scv', 'p1', 10.5, 10)  # Very close
         
         class MockGameState:
             def __init__(self):
-                self.entities = {marine.id: marine, worker.id: worker}
+                self.entities = {marine.id: marine, scv.id: scv}
                 self.grid = SpatialGrid(128, 128)
         
         gs = MockGameState()
         gs.grid.insert(marine)
-        gs.grid.insert(worker)
+        gs.grid.insert(scv)
         
-        initial_dist = marine.pos.dist_to(worker.pos)
+        initial_dist = marine.pos.dist_to(scv.pos)
         
         # Apply repulsion
         marine.update(gs)
         
         # Distance should increase due to repulsion
-        final_dist = marine.pos.dist_to(worker.pos)
+        final_dist = marine.pos.dist_to(scv.pos)
         # Marine should be pushed away since they're overlapping
         # (distance 0.5 < combined radii of 1.0)
         self.assertGreater(final_dist, initial_dist)
@@ -59,11 +59,11 @@ class MovementAndCollisionTests(TestCase):
         grid = SpatialGrid(64, 64, cell_size=8.0)
         
         # Entity at corner
-        e1 = Entity('worker', 'p1', 0, 0, 'e1')
+        e1 = Entity('scv', 'p1', 0, 0, 'e1')
         grid.insert(e1)
         
         # Entity at opposite corner
-        e2 = Entity('worker', 'p2', 63, 63, 'e2')
+        e2 = Entity('scv', 'p2', 63, 63, 'e2')
         grid.insert(e2)
         
         # Should not find each other

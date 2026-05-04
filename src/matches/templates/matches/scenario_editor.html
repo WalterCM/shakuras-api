@@ -322,7 +322,7 @@
 
     const ENTITY_CATEGORIES = {
         neutral: ['mineral_patch', 'base'],
-        terran: ['worker', 'marine', 'tank'],
+        terran: ['scv', 'marine', 'tank'],
         protoss: ['zealot'],
         zerg: ['zergling']
     };
@@ -330,7 +330,7 @@
     const FRIENDLY_NAMES = {
         'mineral_patch': 'Mineral Patch',
         'base': 'Start Location',
-        'worker': 'SCV',
+        'scv': 'SCV',
         'marine': 'Marine',
         'zealot': 'Zealot',
         'zergling': 'Zergling',
@@ -419,7 +419,7 @@
         entities.forEach(e => {
             const d = UNIT_DEFS[e.type];
             ctx.fillStyle = e.owner === 'p1' ? '#3b82f6' : (e.owner === 'p2' ? '#ef4444' : '#eab308');
-            if (e.type === 'mineral_patch') ctx.fillStyle = '#34d399';
+            if (e.type === 'mineral_patch') ctx.fillStyle = '#00f2ff';
             ctx.globalAlpha = 0.7; ctx.fillRect(e.x, e.y, d.width, d.height);
             ctx.globalAlpha = 1.0;
             if (selectedIds.includes(e.id)) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 2/scale; ctx.strokeRect(e.x, e.y, d.width, d.height); }
@@ -437,7 +437,7 @@
             const gx = snap ? Math.floor(mouseWorldPos.x) : mouseWorldPos.x - d.width/2;
             const gy = snap ? Math.floor(mouseWorldPos.y) : mouseWorldPos.y - d.height/2;
             ctx.fillStyle = currentOwner === 'p1' ? '#3b82f6' : (currentOwner === 'p2' ? '#ef4444' : '#eab308');
-            if (currentTool === 'mineral_patch') ctx.fillStyle = '#34d399';
+            if (currentTool === 'mineral_patch') ctx.fillStyle = '#00f2ff';
             ctx.globalAlpha = 0.4; ctx.fillRect(gx, gy, d.width, d.height);
             ctx.globalAlpha = 1.0;
         }

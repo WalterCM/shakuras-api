@@ -591,7 +591,9 @@
                 ctx.roundRect(x - width / 2, y - height / 2, width, height, 2);
 
                 let baseColor = entity.owner_id === 'p1' ? '#3b82f6' : '#ef4444';
-                if (entity.owner_id === 'neutral') baseColor = '#eab308';
+                if (entity.owner_id === 'neutral') {
+                    baseColor = entity.type === 'mineral_patch' ? '#00f2ff' : '#eab308';
+                }
 
                 if (entity.type === 'marine') {
                     ctx.fillStyle = entity.owner_id === 'p1' ? '#00f2ff' : '#ff0055';
@@ -599,7 +601,7 @@
                     ctx.lineWidth = 2 / camera.scale;
                     ctx.shadowColor = ctx.fillStyle;
                     ctx.shadowBlur = 10 * camera.scale;
-                } else if (entity.type === 'worker') {
+                } else if (entity.type === 'scv') {
                     ctx.fillStyle = baseColor;
                     ctx.strokeStyle = entity.carrying > 0 ? '#fbbf24' : 'rgba(0,0,0,0.2)';
                     ctx.lineWidth = (entity.carrying > 0 ? 3 : 1) / camera.scale;
@@ -648,32 +650,6 @@
 
                 ctx.shadowBlur = 0;
                 ctx.closePath();
-
-                const def = UNIT_DEFS[entity.type] || {};
-                const maxHp = def.max_hp || def.hp || 100;
-                const hpPercent = entity.hp / maxHp;
-
-                if (hpPercent < 1.0 || entity.type !== 'mineral_patch') {
-                    ctx.fillStyle = '#1e293b';
-                    ctx.fillRect(x - 10, y - radius - 8, 20, 4);
-                    const barColor = hpPercent > 0.5 ? '#22c55e' : (hpPercent > 0.2 ? '#eab308' : '#ef4444');
-                    ctx.fillStyle = barColor;
-                    ctx.fillRect(x - 10, y - radius - 8, 20 * hpPercent, 4);
-                }
-
-                ctx.fillStyle = 'rgba(255,255,255,0.7)';
-                ctx.font = `${10 / camera.scale}px Inter`;
-                ctx.textAlign = 'center';
-
-                if (entity.type === 'base') {
-                    ctx.fillText(entity.hp.toFixed(0), x, y + 25);
-                } else if (entity.type === 'mineral_patch') {
-                    ctx.fillText(entity.hp.toFixed(0), x, y + 20);
-                } else {
-                    ctx.fillStyle = '#ffffff';
-                    ctx.font = `bold ${8 / camera.scale}px Inter`;
-                    ctx.fillText(entity.type[0].toUpperCase(), x, y + 3);
-                }
             });
             ctx.restore();
         }

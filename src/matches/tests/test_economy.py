@@ -14,8 +14,8 @@ class EconomyTests(TestCase):
 
     def test_mineral_extraction_rate(self):
         """
-        Verify that workers extract exactly 8 minerals per trip.
-        This test runs a controlled simulation with 1 worker and 1 patch.
+        Verify that scvs extract exactly 8 minerals per trip.
+        This test runs a controlled simulation with 1 scv and 1 patch.
         """
         sim = MatchSimulator(self.p1, self.p2)
         sim.setup_match()
@@ -24,21 +24,21 @@ class EconomyTests(TestCase):
         sim.entities = {}
         sim.grid.clear()
         
-        # Spawn 1 base, 1 patch, 1 worker
+        # Spawn 1 base, 1 patch, 1 scv
         base = Entity('base', 'p1', 10, 10)
         patch = Entity('mineral_patch', 'neutral', 15, 10)
-        worker = Entity('worker', 'p1', 11, 10)
+        scv = Entity('scv', 'p1', 11, 10)
         
-        sim.entities = {base.id: base, patch.id: patch, worker.id: worker}
+        sim.entities = {base.id: base, patch.id: patch, scv.id: scv}
         sim.grid.insert(base)
         sim.grid.insert(patch)
-        sim.grid.insert(worker)
+        sim.grid.insert(scv)
         
         # Reset resources
         sim.resources['p1'] = 0
         
         # Start gathering
-        worker.action = GatherAction(patch.id)
+        scv.action = GatherAction(patch.id)
         
         # Run for 1000 ticks (enough for multiple trips)
         for _ in range(1000):

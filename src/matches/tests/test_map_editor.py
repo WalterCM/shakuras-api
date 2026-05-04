@@ -67,7 +67,7 @@ class TestMapEditor:
         tick0 = history[0]
         assert tick0['map']['width'] == 200
         
-        # Should have 2 bases, 8 workers (4 per base), 1 mineral patch = 11 entities
+        # Should have 2 bases, 8 scvs (4 per base), 1 mineral patch = 11 entities
         assert len(tick0['entities']) == 11
         
         # Check base positions (now centered: 10+2, 10+1.5)

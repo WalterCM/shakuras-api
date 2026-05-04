@@ -13,7 +13,7 @@ class CombatEdgeCaseTests(TestCase):
     def test_attack_out_of_range_target(self):
         """Test attacker behavior when target moves out of range"""
         attacker = Entity('marine', 'p1', 0, 0)
-        target = Entity('worker', 'p2', 3, 0)  # Within range initially
+        target = Entity('scv', 'p2', 3, 0)  # Within range initially
         
         class MockGameState:
             def __init__(self):
@@ -41,7 +41,7 @@ class CombatEdgeCaseTests(TestCase):
     def test_attack_dead_target(self):
         """Test attacker behavior when target dies"""
         attacker = Entity('marine', 'p1', 0, 0)
-        target = Entity('worker', 'p2', 3, 0)
+        target = Entity('scv', 'p2', 3, 0)
         
         class MockGameState:
             def __init__(self):
@@ -84,7 +84,7 @@ class CombatEdgeCaseTests(TestCase):
     def test_attack_chase_and_engage(self):
         """Test attack transitions from chase to engage"""
         attacker = Entity('marine', 'p1', 0, 0)
-        target = Entity('worker', 'p2', 20, 0)  # Far away
+        target = Entity('scv', 'p2', 20, 0)  # Far away
         
         class MockGameState:
             def __init__(self):

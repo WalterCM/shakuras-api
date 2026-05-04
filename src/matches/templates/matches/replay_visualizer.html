@@ -426,7 +426,7 @@
                     ctx.lineWidth = 2 / camera.scale;
                     ctx.shadowColor = ctx.fillStyle;
                     ctx.shadowBlur = 10 * camera.scale;
-                } else if (entity.type === 'worker') {
+                } else if (entity.type === 'scv') {
                     ctx.fillStyle = baseColor;
                     ctx.strokeStyle = entity.carrying > 0 ? '#fbbf24' : 'rgba(0,0,0,0.2)';
                     ctx.lineWidth = (entity.carrying > 0 ? 3 : 1) / camera.scale;
@@ -475,7 +475,7 @@
                     ctx.fillText(entity.hp.toFixed(0), x, y + 25);
                     if (entity.prod_queue && entity.prod_queue.length > 0) {
                         const unitName = entity.prod_queue[0].toUpperCase();
-                        const maxProd = unitName === 'MARINE' ? 24 : (unitName === 'WORKER' ? 20 : 120);
+                        const maxProd = unitName === 'MARINE' ? 24 : (unitName === 'scv' ? 20 : 120);
                         ctx.fillStyle = '#1e293b';
                         ctx.fillRect(x - 12, y + 28, 24, 4);
                         ctx.fillStyle = '#3b82f6';

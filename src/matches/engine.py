@@ -174,7 +174,7 @@ class Entity:
         self.current_cooldown = 0
         
         # Resource contention tracking
-        self.occupied_by = None  # For mineral patches: ID of worker currently mining
+        self.occupied_by = None  # For mineral patches: ID of scv currently mining
         
         # Collision & Navigation
         self.pos_memory = []
@@ -460,9 +460,9 @@ class Entity:
             if not other or other.status == 'dead' or other.definition.get('category') in ['building', 'resource']:
                 continue
             
-            # WORKER GHOSTING: 
-            # Workers assigned to minerals ignore collision with other gathering workers to prevent gridlocks.
-            if am_gathering and other.type == 'worker' and isinstance(other.action, GatherAction):
+            # scv GHOSTING: 
+            # SCVs assigned to minerals ignore collision with other gathering scvs to prevent gridlocks.
+            if am_gathering and other.type == 'scv' and isinstance(other.action, GatherAction):
                 continue
 
             dist = rect_dist(self.pos, self.width, self.height, other.pos, other.width, other.height)
@@ -502,12 +502,12 @@ class ProductionAI:
     def update(self, simulator):
         # 1. Production
         if simulator.resources[self.player_id] >= 50:
-            simulator.request_unit(self.player_id, 'worker')
+            simulator.request_unit(self.player_id, 'scv')
             
-        # 2. Maintenance: Re-assign idle workers
+        # 2. Maintenance: Re-assign idle scvs
         from .actions import GatherAction
         for ent in simulator.entities.values():
-            if ent.owner_id == self.player_id and ent.type == 'worker' and ent.status != 'dead':
+            if ent.owner_id == self.player_id and ent.type == 'scv' and ent.status != 'dead':
                 if ent.action is None:
                     # Find a job (locally)
                     patch_id = GatherAction(None)._find_best_patch(ent, simulator, max_dist=30.0)
@@ -588,8 +588,8 @@ class MatchSimulator:
 
         # Assign default actions to newly spawned units
         from .actions import GatherAction, AttackAction
-        if entity.type == 'worker':
-            # Use smart distribution (even for initial/produced workers)
+        if entity.type == 'scv':
+            # Use smart distribution (even for initial/produced scvs)
             # Use max_dist=50 for initial spawns to accommodate slightly spread layouts
             patch_id = GatherAction(None)._find_best_patch(entity, self, max_dist=50.0)
             if patch_id:
@@ -607,8 +607,7 @@ class MatchSimulator:
                 entity.action.prepare(entity, self)
 
     def setup_match(self):
-        # 1. Minerals FIRST so workers can find them when spawned
-        # Support both legacy format (map_data.minerals) and YAML entities
+        # 1. Minerals FIRST so scvs can find them when spawned
         for m in self.map_data.minerals:
             if hasattr(m, 'x'):
                 mx, my = m.x, m.y
@@ -646,12 +645,12 @@ class MatchSimulator:
             base.pos.y += base.height / 2.0
             self.add_entity(base)
             
-            # 3. Initial workers near base (spawned AFTER minerals)
+            # 3. Initial scvs near base (spawned AFTER minerals)
             bx, by = base.pos.x, base.pos.y
             offsets = [(-1.5, 2.5), (-0.5, 2.5), (0.5, 2.5), (1.5, 2.5)] 
             for i in range(4):
                 ox, oy = offsets[i]
-                self.add_entity(Entity('worker', pid, bx + ox, by + oy))
+                self.add_entity(Entity('scv', pid, bx + ox, by + oy))
 
 
 
