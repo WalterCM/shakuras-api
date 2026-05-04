@@ -267,6 +267,7 @@
 
         <div class="control-group" style="border-top: 1px solid rgba(255,255,255,0.05); padding-top: 10px;">
             <label>Reference</label>
+            <div id="ref-status" style="font-size: 10px; color: var(--accent); margin-bottom: 4px; font-weight: 600;">No image loaded</div>
             <input type="file" id="ref-input" accept="image/*" style="font-size: 10px;">
             <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
                 <label style="font-size: 10px; color: var(--text-dim);">Opacity</label>
@@ -297,11 +298,15 @@
     const canvas = document.getElementById('editor-canvas');
     const ctx = canvas.getContext('2d');
     
-    let entities = [], triggers = [], selectedId = null, currentTool = 'cursor', currentOwner = 'p1', currentCategory = 'neutral';
+    let entities = [], triggers = [], selectedIds = [], currentTool = 'cursor', currentOwner = 'p1', currentCategory = 'neutral';
     let scale = 4, offsetX = 0, offsetY = 0, isPanning = false, lastMousePos = { x: 0, y: 0 };
     let mapW = 128, mapH = 128, currentPath = null;
     let mouseWorldPos = { x: 0, y: 0 };
     
+    // Multi-select & Drag State
+    let isSelecting = false, selectionStart = { x: 0, y: 0 };
+    let isDragging = false, draggedId = null, dragOffsets = {}, draggedWaypoint = null; 
+
     // Undo/Redo Stacks
     let undoStack = [], redoStack = [];
     function saveState() {
@@ -325,7 +330,7 @@
     const FRIENDLY_NAMES = {
         'mineral_patch': 'Mineral Patch',
         'base': 'Start Location',
-        'worker': 'Worker',
+        'worker': 'SCV',
         'marine': 'Marine',
         'zealot': 'Zealot',
         'zergling': 'Zergling',
@@ -417,7 +422,7 @@
             if (e.type === 'mineral_patch') ctx.fillStyle = '#34d399';
             ctx.globalAlpha = 0.7; ctx.fillRect(e.x, e.y, d.width, d.height);
             ctx.globalAlpha = 1.0;
-            if (e.id === selectedId) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 2/scale; ctx.strokeRect(e.x, e.y, d.width, d.height); }
+            if (selectedIds.includes(e.id)) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 2/scale; ctx.strokeRect(e.x, e.y, d.width, d.height); }
             
             if (showCollisions) {
                 ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 1/scale;
@@ -437,15 +442,41 @@
             ctx.globalAlpha = 1.0;
         }
 
+        // Selection Box
+        if (isSelecting) {
+            ctx.strokeStyle = '#10b981';
+            ctx.lineWidth = 1/scale;
+            ctx.fillStyle = 'rgba(16, 185, 129, 0.1)';
+            const x = Math.min(selectionStart.x, mouseWorldPos.x);
+            const y = Math.min(selectionStart.y, mouseWorldPos.y);
+            const w = Math.abs(selectionStart.x - mouseWorldPos.x);
+            const h = Math.abs(selectionStart.y - mouseWorldPos.y);
+            ctx.fillRect(x, y, w, h);
+            ctx.strokeRect(x, y, w, h);
+        }
+
         triggers.forEach(t => {
             const e = entities.find(ent => ent.id === t.entity);
             if (!e) return;
             const d = UNIT_DEFS[e.type];
             ctx.beginPath(); ctx.setLineDash([1,1]); ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1/scale;
             ctx.moveTo(e.x + d.width/2, e.y + d.height/2);
-            if (t.action.target) ctx.lineTo(t.action.target.x, t.action.target.y);
-            else if (t.action.target_id) { const tar = entities.find(ent => ent.id === t.action.target_id); if (tar) ctx.lineTo(tar.x, tar.y); }
-            ctx.stroke(); ctx.setLineDash([]);
+            if (t.action.target) {
+                ctx.lineTo(t.action.target.x, t.action.target.y);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                // Draw Waypoint Handle
+                ctx.fillStyle = selectedIds.includes(`wp_${t.entity}`) ? '#fff' : '#10b981';
+                ctx.beginPath(); ctx.arc(t.action.target.x, t.action.target.y, 0.3, 0, Math.PI*2); ctx.fill();
+            } else if (t.action.target_id) { 
+                const tar = entities.find(ent => ent.id === t.action.target_id); 
+                if (tar) {
+                    const td = UNIT_DEFS[tar.type];
+                    ctx.lineTo(tar.x + td.width/2, tar.y + td.height/2);
+                    ctx.stroke();
+                }
+            }
+            ctx.setLineDash([]);
         });
 
         requestAnimationFrame(draw);
@@ -459,13 +490,22 @@
         
         if (e.button === 2) {
             if (currentTool !== 'cursor') { setTool('cursor'); return; }
-            if (selectedId) {
-                const ent = entities.find(ent => ent.id === selectedId);
+            if (selectedIds.length > 0) {
+                // Assign orders to all selected
+                const firstId = selectedIds[0];
+                const ent = entities.find(ent => ent.id === firstId);
                 if (!ent || ent.owner === 'neutral') return;
+                
                 let tar = entities.find(ent => { const d = UNIT_DEFS[ent.type]; return w.x >= ent.x && w.x <= ent.x + d.width && w.y >= ent.y && w.y <= ent.y + d.height; });
-                triggers = triggers.filter(t => !(t.entity === selectedId && t.tick === 0));
-                if (tar) triggers.push({ tick: 0, entity: selectedId, action: { type: tar.type === 'mineral_patch' ? 'gather' : (tar.owner !== ent.owner ? 'attack' : 'move'), target_id: tar.id } });
-                else triggers.push({ tick: 0, entity: selectedId, action: { type: 'move', target: { x: w.x, y: w.y } } });
+                
+                selectedIds.forEach(id => {
+                    const e = entities.find(e => e.id === id);
+                    if (!e || e.owner === 'neutral') return;
+                    triggers = triggers.filter(t => !(t.entity === id && t.tick === 0));
+                    if (tar) triggers.push({ tick: 0, entity: id, action: { type: tar.type === 'mineral_patch' ? 'gather' : (tar.owner !== e.owner ? 'attack' : 'move'), target_id: tar.id } });
+                    else triggers.push({ tick: 0, entity: id, action: { type: 'move', target: { x: w.x, y: w.y } } });
+                });
+                
                 saveState(); updateInspector();
             }
             return;
@@ -473,8 +513,47 @@
 
         if (e.button === 0) {
             if (currentTool === 'cursor') {
+                // Common logic for dragging either a waypoint or an entity
+                const startDrag = () => {
+                    isDragging = true;
+                    dragOffsets = {};
+                    selectedIds.forEach(id => {
+                        if (id.startsWith('wp_')) {
+                            const eid = id.replace('wp_', '');
+                            const trig = triggers.find(t => t.entity === eid && t.tick === 0);
+                            if (trig && trig.action.target) dragOffsets[id] = { x: w.x - trig.action.target.x, y: w.y - trig.action.target.y };
+                        } else {
+                            const ent = entities.find(e => e.id === id);
+                            if (ent) dragOffsets[id] = { x: w.x - ent.x, y: w.y - ent.y };
+                        }
+                    });
+                };
+
+                let clickedWP = triggers.find(t => t.action.target && Math.hypot(t.action.target.x - w.x, t.action.target.y - w.y) < 0.5);
+                if (clickedWP) {
+                    const wpId = `wp_${clickedWP.entity}`;
+                    if (!selectedIds.includes(wpId)) {
+                        if (!e.ctrlKey) selectedIds = [wpId];
+                        else selectedIds.push(wpId);
+                    }
+                    draggedWaypoint = clickedWP.entity;
+                    startDrag();
+                    updateInspector(); updateUI(); return;
+                }
+
                 let clicked = entities.find(ent => { const d = UNIT_DEFS[ent.type]; return w.x >= ent.x && w.x <= ent.x + d.width && w.y >= ent.y && w.y <= ent.y + d.height; });
-                selectedId = clicked ? clicked.id : null;
+                if (clicked) {
+                    if (!selectedIds.includes(clicked.id)) {
+                        if (!e.ctrlKey) selectedIds = [clicked.id];
+                        else selectedIds.push(clicked.id);
+                    }
+                    draggedId = clicked.id;
+                    startDrag();
+                } else {
+                    isSelecting = true;
+                    selectionStart = { x: w.x, y: w.y };
+                    if (!e.ctrlKey) selectedIds = [];
+                }
                 updateInspector();
             } else if (currentTool === 'delete') {
                 const prevLen = entities.length;
@@ -486,7 +565,7 @@
                 const px = snap ? Math.floor(w.x) : w.x - d.width/2;
                 const py = snap ? Math.floor(w.y) : w.y - d.height/2;
                 entities.push({ id: `${currentTool}_${Date.now()}`, type: currentTool, owner: currentOwner, x: px, y: py });
-                selectedId = entities[entities.length-1].id; saveState(); updateInspector();
+                selectedIds = [entities[entities.length-1].id]; saveState(); updateInspector();
             }
         }
         updateUI();
@@ -497,10 +576,63 @@
         const sx = e.clientX - r.left, sy = e.clientY - r.top;
         const world = screenToWorld(e.clientX, e.clientY);
         mouseWorldPos = world;
-        if (isPanning) { offsetX += sx - lastMousePos.x; offsetY += sy - lastMousePos.y; lastMousePos = { x: sx, y: sy }; }
-        else { document.getElementById('ui-coord').textContent = `${world.x.toFixed(1)}, ${world.y.toFixed(1)}`; }
+
+        if (isPanning) { 
+            offsetX += sx - lastMousePos.x; 
+            offsetY += sy - lastMousePos.y; 
+            lastMousePos = { x: sx, y: sy }; 
+        } else if (isDragging && selectedIds.length > 0) {
+            selectedIds.forEach(id => {
+                const snap = document.getElementById('snap-grid').checked;
+                if (id.startsWith('wp_')) {
+                    const eid = id.replace('wp_', '');
+                    const trig = triggers.find(t => t.entity === eid && t.tick === 0);
+                    if (trig && trig.action.target && dragOffsets[id]) {
+                        const targetX = world.x - dragOffsets[id].x;
+                        const targetY = world.y - dragOffsets[id].y;
+                        trig.action.target.x = snap ? Math.round(targetX) : targetX;
+                        trig.action.target.y = snap ? Math.round(targetY) : targetY;
+                    }
+                } else {
+                    const ent = entities.find(e => e.id === id);
+                    if (ent && dragOffsets[id]) {
+                        const targetX = world.x - dragOffsets[id].x;
+                        const targetY = world.y - dragOffsets[id].y;
+                        ent.x = snap ? Math.round(targetX) : targetX;
+                        ent.y = snap ? Math.round(targetY) : targetY;
+                    }
+                }
+            });
+        } else if (isSelecting) {
+            // Selection logic is handled in draw, final selection in mouseup
+        } else { 
+            document.getElementById('ui-coord').textContent = `${world.x.toFixed(1)}, ${world.y.toFixed(1)}`; 
+        }
     });
-    window.addEventListener('mouseup', () => isPanning = false);
+
+    window.addEventListener('mouseup', () => {
+        if (isSelecting) {
+            const xmin = Math.min(selectionStart.x, mouseWorldPos.x), xmax = Math.max(selectionStart.x, mouseWorldPos.x);
+            const ymin = Math.min(selectionStart.y, mouseWorldPos.y), ymax = Math.max(selectionStart.y, mouseWorldPos.y);
+            entities.forEach(ent => {
+                const d = UNIT_DEFS[ent.type], ex = ent.x + d.width/2, ey = ent.y + d.height/2;
+                if (ex >= xmin && ex <= xmax && ey >= ymin && ey <= ymax) { if (!selectedIds.includes(ent.id)) selectedIds.push(ent.id); }
+            });
+            // Also select waypoints
+            triggers.forEach(t => {
+                if (t.action.target) {
+                    if (t.action.target.x >= xmin && t.action.target.x <= xmax && t.action.target.y >= ymin && t.action.target.y <= ymax) {
+                        const wpId = `wp_${t.entity}`;
+                        if (!selectedIds.includes(wpId)) selectedIds.push(wpId);
+                    }
+                }
+            });
+            isSelecting = false; updateInspector();
+        }
+        if (isDragging) { saveState(); isDragging = false; draggedId = null; draggedWaypoint = null; }
+        isPanning = false;
+    });
+
     canvas.addEventListener('wheel', (e) => {
         e.preventDefault(); const r = canvas.getBoundingClientRect(); const mx = e.clientX - r.left, my = e.clientY - r.top;
         const wx = (mx - canvas.width/2 - offsetX) / scale, wy = (my - canvas.height/2 - offsetY) / scale;
@@ -514,12 +646,29 @@
         if (e.ctrlKey && e.code === 'KeyY') { e.preventDefault(); redo(); }
         if (e.code === 'KeyC') { const cb = document.getElementById('show-collisions'); cb.checked = !cb.checked; }
         if (e.code === 'Escape') { setTool('cursor'); }
+        if (e.code === 'Delete' || e.code === 'Backspace') {
+            if (selectedIds.length > 0) {
+                entities = entities.filter(e => !selectedIds.includes(e.id));
+                selectedIds = [];
+                saveState(); updateInspector();
+            }
+        }
     });
 
     function updateInspector() {
-        const e = entities.find(ent => ent.id === selectedId);
+        if (selectedIds.length === 0) {
+            document.getElementById('ins-name').textContent = 'No Selection';
+            document.getElementById('ins-orders').innerHTML = '';
+            return;
+        }
+        if (selectedIds.length > 1) {
+            document.getElementById('ins-name').textContent = `${selectedIds.length} items selected`;
+            document.getElementById('ins-orders').innerHTML = '';
+            return;
+        }
+        const e = entities.find(ent => ent.id === selectedIds[0]);
         document.getElementById('ins-name').textContent = e ? `${(FRIENDLY_NAMES[e.type] || e.type).toUpperCase()} (${e.owner})` : 'No Selection';
-        const t = triggers.filter(tr => tr.entity === selectedId);
+        const t = triggers.filter(tr => tr.entity === selectedIds[0]);
         document.getElementById('ins-orders').innerHTML = t.map(tr => `<div style="font-size:11px; margin-bottom:4px; border-left:2px solid var(--accent); padding-left:8px;">T${tr.tick}: ${tr.action.type.toUpperCase()}</div>`).join('');
     }
 
@@ -569,16 +718,30 @@
         ed.style.display = 'flex';
         
         // Reset camera to center the new map
-        offsetX = 0;
-        offsetY = 0;
         scale = 4;
+        offsetX = -(mapW / 2) * scale;
+        offsetY = -(mapH / 2) * scale;
         
         resize();
         updateUI();
     }
 
-    function loadRefImage(filename) { refImageFilename = filename; refImage = new Image(); refImage.src = `/matches/editor/reference/?path=${encodeURIComponent(filename)}`; }
-    document.getElementById('ref-input').onchange = async (e) => { const file = e.target.files[0]; if (!file) return; const fd = new FormData(); fd.append('image', file); const res = await fetch('/matches/editor/reference/upload/', { method: 'POST', body: fd }); const d = await res.json(); if (d.status === 'ok') loadRefImage(d.path); };
+    function loadRefImage(filename) { 
+        refImageFilename = filename; 
+        refImage = new Image(); 
+        refImage.src = `/matches/editor/reference/?path=${encodeURIComponent(filename)}`; 
+        document.getElementById('ref-status').textContent = `ACTIVE: ${filename}`;
+    }
+    
+    document.getElementById('ref-input').onchange = async (e) => { 
+        const file = e.target.files[0]; 
+        if (!file) return; 
+        const fd = new FormData(); 
+        fd.append('image', file); 
+        const res = await fetch('/matches/editor/reference/upload/', { method: 'POST', body: fd }); 
+        const d = await res.json(); 
+        if (d.status === 'ok') loadRefImage(d.path); 
+    };
     document.getElementById('ref-opacity').oninput = (e) => refOpacity = parseFloat(e.target.value);
     async function save(run) {
         const saveBtn = document.getElementById('save-btn'); const originalText = saveBtn.innerText; saveBtn.disabled = true; saveBtn.innerText = 'Saving...';
@@ -592,7 +755,20 @@
             } else throw new Error(r.message || 'Unknown error');
         } catch (err) { alert('Save failed: ' + err.message); saveBtn.innerText = originalText; saveBtn.disabled = false; }
     }
-    function startNew(w,h) { mapW=w; mapH=h; entities=[]; triggers=[]; saveState(); document.getElementById('screen-select').style.display='none'; const ed=document.getElementById('screen-editor'); ed.style.visibility='visible'; ed.style.display='flex'; resize(); updateUI(); }
+    function startNew(w,h) { 
+        mapW=w; mapH=h; entities=[]; triggers=[]; saveState(); 
+        document.getElementById('map-w').value = w;
+        document.getElementById('map-h').value = h;
+        document.getElementById('screen-select').style.display='none'; 
+        const ed=document.getElementById('screen-editor'); 
+        ed.style.visibility='visible'; ed.style.display='flex'; 
+        
+        scale = 4;
+        offsetX = -(mapW / 2) * scale;
+        offsetY = -(mapH / 2) * scale;
+        
+        resize(); updateUI(); 
+    }
     function resize() { canvas.width = canvas.parentElement.clientWidth; canvas.height = canvas.parentElement.clientHeight; }
     window.onresize = resize; canvas.oncontextmenu = (e) => e.preventDefault();
     initPalette(); refreshList(); resize(); draw();

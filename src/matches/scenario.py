@@ -152,7 +152,9 @@ def execute_scenario(scenario_data):
     history = sim.simulate()
     return {
         'history': history,
-        'static_grid': sim.nav_grid.static_grid
+        'static_grid': sim.nav_grid.static_grid,
+        'width': sim.map_data.width,
+        'height': sim.map_data.height
     }
 
 

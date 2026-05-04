@@ -251,13 +251,7 @@ def save_scenario_api(request):
             base_dir = SCENARIOS_DIR if has_triggers else MAPS_DIR
             
             scenario_path = data.get('path')
-            if not scenario_path:
-                name_slug = data.get('name', 'new_file').replace(' ', '_').lower()
-                scenario_path = f"{name_slug}.yaml"
-            
-            # If path was from maps/ but now has triggers, move to scenarios/
-            # (Or vice versa) - but for now just resolve name
-            filename = Path(scenario_path).name
+            filename = Path(scenario_path).name if scenario_path else f"{data.get('name', 'new_file').replace(' ', '_').lower()}.yaml"
             full_path = base_dir / filename
             
             yaml_content = {
@@ -276,7 +270,8 @@ def save_scenario_api(request):
                 yaml.dump(yaml_content, f, default_flow_style=False, sort_keys=False)
             
             # Return relative path for the frontend
-            rel_path = f"scenarios/{filename}" if has_triggers else f"maps/{filename}"
+            dir_prefix = "scenarios" if has_triggers else "maps"
+            rel_path = f"{dir_prefix}/{filename}"
             return JsonResponse({'status': 'ok', 'path': rel_path})
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
@@ -310,7 +305,9 @@ def run_scenario_api(request):
             return JsonResponse({
                 'status': 'ok', 
                 'replay': result['history'],
-                'static_grid': result['static_grid']
+                'static_grid': result['static_grid'],
+                'width': result.get('width', 128),
+                'height': result.get('height', 128)
             })
         except yaml.YAMLError as e:
             return JsonResponse({'status': 'error', 'message': f'YAML error: {str(e)}'}, status=400)
@@ -338,7 +335,9 @@ def run_scenario_upload_api(request):
             return JsonResponse({
                 'status': 'ok', 
                 'replay': result['history'],
-                'static_grid': result['static_grid']
+                'static_grid': result['static_grid'],
+                'width': result.get('width', 128),
+                'height': result.get('height', 128)
             })
         except yaml.YAMLError as e:
             return JsonResponse({'status': 'error', 'message': f'YAML error: {str(e)}'}, status=400)
