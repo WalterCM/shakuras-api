@@ -234,6 +234,13 @@
                     <option value="10">10x</option>
                 </select>
                 <button id="reset" disabled>Reset</button>
+                <div style="display: flex; gap: 0.2rem;">
+                    <button id="step-prev" style="min-width: 40px;" title="Step Back (Left Arrow)">[<]</button>
+                    <button id="step-next" style="min-width: 40px;" title="Step Forward (Right Arrow)">[>]</button>
+                </div>
+            </div>
+            <div style="margin-top: 0.5rem; font-size: 0.75rem; color: #64748b;">
+                [Space] Play/Pause | [C] Toggle Collisions | [Arrows] Step Ticks
             </div>
         </div>
         <div id="delta-log">
@@ -279,6 +286,8 @@
 
         // Reconstructed state for current frame
         let entitiesState = {};
+        let showCollisions = false;
+        let staticGrid = null;
 
         const sourceType = document.getElementById('sourceType');
         const fileInput = document.getElementById('fileInput');
@@ -299,6 +308,8 @@
         const scenarioDesc = document.getElementById('scenarioDesc');
         const errorMsg = document.getElementById('errorMsg');
         const loadingMsg = document.getElementById('loadingMsg');
+        const stepPrevBtn = document.getElementById('step-prev');
+        const stepNextBtn = document.getElementById('step-next');
 
         let playerResources = {};
         let monitoredEntityId = null;
@@ -359,6 +370,7 @@
                 }
                 
                 replayData = result.replay;
+                staticGrid = result.static_grid; // Backend should send this
                 
                 // Find scenario name for display
                 let name = 'Custom Scenario';
@@ -533,6 +545,10 @@
                             const color = diff < 0 ? '#ef4444' : '#22c55e';
                             addLogEntry(tickIndex, `hp: <span class="log-val">${ent.hp}</span> → <span class="log-val" style="color: ${color}">${delta.hp}</span>`);
                         }
+                        if (delta.action_details) {
+                            // Render action details if they changed or are new
+                            updateActionDetails(delta.action_details);
+                        }
                     }
 
                     if (delta.hp !== undefined && delta.hp < ent.hp) {
@@ -565,26 +581,55 @@
         }
 
         function draw() {
+            // 1. CLEAR CANVAS (Always in screen coordinates)
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
             ctx.fillStyle = '#020617';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+            // 2. APPLY CAMERA TRANSFORMATION
             ctx.save();
             ctx.setTransform(camera.scale, 0, 0, camera.scale, camera.offsetX, camera.offsetY);
 
+            // 3. DRAW MAP BACKGROUND
             ctx.fillStyle = '#0f172a';
             ctx.fillRect(0, 0, MAP_WIDTH * SCALE, MAP_HEIGHT * SCALE);
 
+            // 4. DRAW GRID (Optimized: Single stroke calls)
+            ctx.lineWidth = 0.5 / camera.scale;
+            
+            // 1x1 Sub-tiles
+            ctx.beginPath();
             ctx.strokeStyle = '#1e293b';
-            ctx.lineWidth = 1 / camera.scale;
-            for (let i = 0; i <= MAP_WIDTH; i += 8) {
-                ctx.beginPath();
+            for (let i = 0; i <= MAP_WIDTH; i++) {
                 ctx.moveTo(i * SCALE, 0); ctx.lineTo(i * SCALE, MAP_HEIGHT * SCALE);
-                ctx.stroke();
+            }
+            for (let i = 0; i <= MAP_HEIGHT; i++) {
+                ctx.moveTo(0, i * SCALE); ctx.lineTo(MAP_WIDTH * SCALE, i * SCALE);
+            }
+            ctx.stroke();
+
+            // 8x8 Main Tiles
+            ctx.beginPath();
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 2 / camera.scale;
+            for (let i = 0; i <= MAP_WIDTH; i += 8) {
+                ctx.moveTo(i * SCALE, 0); ctx.lineTo(i * SCALE, MAP_HEIGHT * SCALE);
             }
             for (let i = 0; i <= MAP_HEIGHT; i += 8) {
-                ctx.beginPath();
                 ctx.moveTo(0, i * SCALE); ctx.lineTo(MAP_WIDTH * SCALE, i * SCALE);
-                ctx.stroke();
+            }
+            ctx.stroke();
+
+            // 5. RENDER COLLISION GRID (Ghost Mode)
+            if (showCollisions && staticGrid) {
+                ctx.fillStyle = 'rgba(239, 68, 68, 0.3)';
+                for (let x = 0; x < MAP_WIDTH; x++) {
+                    for (let y = 0; y < MAP_HEIGHT; y++) {
+                        if (staticGrid[x][y]) {
+                            ctx.fillRect(x * SCALE, y * SCALE, SCALE, SCALE);
+                        }
+                    }
+                }
             }
 
             tickDisplay.textContent = `Tick: ${currentTick} / ${MAX_TICKS}`;
@@ -637,6 +682,28 @@
                     ctx.setLineDash([5, 5]);
                     ctx.stroke();
                     ctx.setLineDash([]);
+                }
+
+                // Render Waypoints/Path
+                if (entity.waypoints && entity.waypoints.length > 0) {
+                    ctx.beginPath();
+                    ctx.setLineDash([2, 2]);
+                    ctx.strokeStyle = entity.owner_id === 'p1' ? 'rgba(59, 130, 246, 0.5)' : 'rgba(239, 68, 68, 0.5)';
+                    ctx.lineWidth = 1 / camera.scale;
+                    ctx.moveTo(x, y);
+                    entity.waypoints.forEach(wp => {
+                        ctx.lineTo(wp.x * SCALE, wp.y * SCALE);
+                    });
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    
+                    // Draw small dots at waypoints
+                    entity.waypoints.forEach(wp => {
+                        ctx.beginPath();
+                        ctx.arc(wp.x * SCALE, wp.y * SCALE, 2 / camera.scale, 0, Math.PI * 2);
+                        ctx.fillStyle = ctx.strokeStyle;
+                        ctx.fill();
+                    });
                 }
 
                 ctx.shadowBlur = 0;
@@ -719,6 +786,55 @@
 
         progressCtrl.oninput = () => jumpToTick(parseInt(progressCtrl.value));
         speedCtrl.onchange = () => playbackSpeed = parseFloat(speedCtrl.value);
+
+        stepPrevBtn.onclick = () => {
+            isPlaying = false;
+            playPauseBtn.textContent = 'Play';
+            jumpToTick(Math.max(0, currentTick - 1));
+        };
+        stepNextBtn.onclick = () => {
+            isPlaying = false;
+            playPauseBtn.textContent = 'Play';
+            jumpToTick(Math.min(MAX_TICKS, currentTick + 1));
+        };
+
+        function updateActionDetails(details) {
+            if (!details) return;
+            const detailStr = Object.entries(details)
+                .filter(([k]) => k !== 'type')
+                .map(([k, v]) => `<div style="margin-left: 10px; color: #94a3b8;">• ${k}: <span style="color: #f8fafc;">${JSON.stringify(v)}</span></div>`)
+                .join('');
+            
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span class="log-tick">[Tick ${currentTick}]</span> <span style="color: #3b82f6; font-weight: bold;">${details.type}</span>${detailStr}`;
+            logContent.prepend(entry);
+        }
+
+        // Keyboard Shortcuts
+        window.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+
+            switch(e.code) {
+                case 'Space':
+                    e.preventDefault();
+                    playPauseBtn.click();
+                    break;
+                case 'KeyC':
+                    showCollisions = !showCollisions;
+                    draw();
+                    break;
+                case 'ArrowRight':
+                    stepNextBtn.click();
+                    break;
+                case 'ArrowLeft':
+                    stepPrevBtn.click();
+                    break;
+                case 'KeyR':
+                    resetBtn.click();
+                    break;
+            }
+        });
 
         draw();
         requestAnimationFrame(animate);

@@ -218,7 +218,9 @@ class Entity:
             'prod_progress': self.production_progress,
             'radius': round(self.radius, 2),
             'width': self.width,
-            'height': self.height
+            'height': self.height,
+            'waypoints': [{'x': round(wp.x, 2), 'y': round(wp.y, 2)} for wp in self.waypoints],
+            'action_details': self.action.to_dict() if self.action else None
         }
 
     def set_action(self, action):
@@ -511,6 +513,7 @@ class ProductionAI:
                     patch_id = GatherAction(None)._find_best_patch(ent, simulator, max_dist=30.0)
                     if patch_id:
                         ent.set_action(GatherAction(patch_id))
+                        ent.action.prepare(ent, simulator)
 
 class MatchSimulator:
     """Handles the simulation loop of a match using JSON Deltas for efficiency"""
@@ -591,6 +594,7 @@ class MatchSimulator:
             patch_id = GatherAction(None)._find_best_patch(entity, self, max_dist=50.0)
             if patch_id:
                 entity.set_action(GatherAction(patch_id))
+                entity.action.prepare(entity, self)
         
         elif entity.type in ['marine', 'zealot', 'zergling']:
             # Combat units attack nearest enemy
@@ -600,6 +604,7 @@ class MatchSimulator:
             if enemies:
                 closest = min(enemies, key=lambda e: entity.pos.dist_to_sq(e.pos))
                 entity.set_action(AttackAction(closest.id))
+                entity.action.prepare(entity, self)
 
     def setup_match(self):
         # 1. Minerals FIRST so workers can find them when spawned
@@ -671,6 +676,7 @@ class MatchSimulator:
             entity = self.entities.get(trigger['entity_id'])
             if entity:
                 entity.set_action(trigger['action'])
+                entity.action.prepare(entity, self)
 
         for tick in range(1, self.max_ticks + 1):
             # 1. Execute triggers for this tick
@@ -678,6 +684,7 @@ class MatchSimulator:
                 entity = self.entities.get(trigger['entity_id'])
                 if entity:
                     entity.set_action(trigger['action'])
+                    entity.action.prepare(entity, self)
 
             # 2. Update Controllers
             for ai in self.ai_controllers:

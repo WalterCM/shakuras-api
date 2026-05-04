@@ -13,11 +13,19 @@ class Action(ABC):
     def update(self, entity, game_state):
         """Execute one tick of this action"""
         pass
+
+    def prepare(self, entity, game_state):
+        """Initialize any state needed before the first update (e.g. pathfinding)"""
+        pass
     
     @abstractmethod
     def get_status(self):
         """Return the status string for visualization"""
         pass
+
+    def to_dict(self):
+        """Return internal state for debugging"""
+        return {'type': self.__class__.__name__}
 
 
 class GatherAction(Action):
@@ -27,6 +35,14 @@ class GatherAction(Action):
         self.target_patch_id = target_patch_id
         self.phase = 'moving_to_patch'  # or 'mining' or 'returning'
         self.mining_cooldown = 0
+    
+    def to_dict(self):
+        return {
+            'type': 'GatherAction',
+            'phase': self.phase,
+            'target_id': self.target_patch_id,
+            'cooldown': self.mining_cooldown
+        }
     
     def update(self, entity, game_state):
         if self.phase == 'moving_to_patch':
@@ -229,12 +245,26 @@ class AttackAction(Action):
     def get_status(self):
         return 'attack'
 
+    def to_dict(self):
+        return {
+            'type': 'AttackAction',
+            'target_id': self.target_id
+        }
+
 
 class MoveAction(Action):
     """Move to a destination (Move button)"""
     
     def __init__(self, destination):
         self.destination = destination
+
+    def prepare(self, entity, game_state):
+        if not entity.waypoints:
+            raw_path = game_state.pathfinder.find_path(entity.pos, self.destination, entity=entity)
+            if raw_path:
+                entity.waypoints = game_state.pathfinder.smooth_path(raw_path, entity, game_state)
+            else:
+                entity.waypoints = [self.destination]
     
     def update(self, entity, game_state):
         # 1. Initialize path if needed
@@ -262,6 +292,12 @@ class MoveAction(Action):
     
     def get_status(self):
         return 'move'
+
+    def to_dict(self):
+        return {
+            'type': 'MoveAction',
+            'destination': {'x': self.destination.x, 'y': self.destination.y}
+        }
 
 
 class HoldAction(Action):

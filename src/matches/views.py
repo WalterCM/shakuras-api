@@ -204,8 +204,12 @@ def run_scenario_api(request):
             if not full_path.exists():
                 return JsonResponse({'status': 'error', 'message': 'Scenario not found'}, status=404)
             
-            replay_data = run_scenario_from_file(full_path)
-            return JsonResponse({'status': 'ok', 'replay': replay_data})
+            result = run_scenario_from_file(full_path)
+            return JsonResponse({
+                'status': 'ok', 
+                'replay': result['history'],
+                'static_grid': result['static_grid']
+            })
         except yaml.YAMLError as e:
             return JsonResponse({'status': 'error', 'message': f'YAML error: {str(e)}'}, status=400)
         except Exception as e:
@@ -227,9 +231,13 @@ def run_scenario_upload_api(request):
             
             # Execute scenario directly (scenarios now include all needed data)
             from matches.scenario import execute_scenario
-            replay_data = execute_scenario(scenario_data)
+            result = execute_scenario(scenario_data)
             
-            return JsonResponse({'status': 'ok', 'replay': replay_data})
+            return JsonResponse({
+                'status': 'ok', 
+                'replay': result['history'],
+                'static_grid': result['static_grid']
+            })
         except yaml.YAMLError as e:
             return JsonResponse({'status': 'error', 'message': f'YAML error: {str(e)}'}, status=400)
         except Exception as e:

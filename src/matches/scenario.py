@@ -149,7 +149,11 @@ def execute_scenario(scenario_data):
             })
     
     # 7. Run simulation (uses the same loop as normal matches)
-    return sim.simulate()
+    history = sim.simulate()
+    return {
+        'history': history,
+        'static_grid': sim.nav_grid.static_grid
+    }
 
 
 def run_scenario_from_file(yaml_path):

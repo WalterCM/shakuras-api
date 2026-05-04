@@ -35,7 +35,7 @@ class AStarPathfinder:
             _, current = heapq.heappop(open_set)
 
             if current == end_tile:
-                return self._reconstruct_path(came_from, current, end_pos)
+                return self._reconstruct_path(came_from, current, end_pos, start_pos)
 
             # Check 8 neighbors
             for dx in [-1, 0, 1]:
@@ -73,7 +73,7 @@ class AStarPathfinder:
         # No path found
         return []
 
-    def _reconstruct_path(self, came_from, current, final_pos):
+    def _reconstruct_path(self, came_from, current, final_pos, start_pos):
         path = []
         # Start with the exact final position to ensure precision at the destination
         path.append(final_pos)
@@ -84,8 +84,13 @@ class AStarPathfinder:
             path.append(Vector2D(current[0] + 0.5, current[1] + 0.5))
         
         path.reverse()
-        # Remove the first waypoint if it's too close to the current start position
-        # (This avoids the unit trying to walk backwards to a tile center)
+        
+        # Override the first waypoint to be the EXACT starting position
+        # This makes the path start under the unit and allows String Pulling
+        # to skip the 'centering' waypoint if there's a clear line of sight.
+        if len(path) > 0:
+            path[0] = start_pos
+                
         return path
 
     def smooth_path(self, path, entity, game_state):
