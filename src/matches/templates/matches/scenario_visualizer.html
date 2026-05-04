@@ -328,75 +328,54 @@
         });
 
         // Run button
-        runBtn.addEventListener('click', async () => {
+        runBtn.addEventListener('click', () => {
+            const scenarioPath = sourceType.value === 'file' ? null : scenarioSelect.value;
+            runScenario(scenarioPath);
+        });
+
+        async function runScenario(path = null) {
             errorMsg.style.display = 'none';
             loadingMsg.style.display = 'block';
             
             try {
                 let response;
                 
-                if (sourceType.value === 'file') {
+                if (!path && sourceType.value === 'file') {
                     const yamlFile = document.getElementById('yamlFile').files[0];
-                    if (!yamlFile) {
-                        throw new Error('Please select a YAML file');
-                    }
+                    if (!yamlFile) throw new Error('Please select a YAML file');
                     
                     const formData = new FormData();
                     formData.append('file', yamlFile);
-                    
-                    response = await fetch('/matches/scenarios/upload/', {
-                        method: 'POST',
-                        body: formData
-                    });
+                    response = await fetch('/matches/scenarios/upload/', { method: 'POST', body: formData });
                 } else {
-                    const scenarioPath = scenarioSelect.value;
-                    if (!scenarioPath) {
-                        throw new Error('Please select a scenario');
-                    }
+                    const scenarioPath = path || scenarioSelect.value;
+                    if (!scenarioPath) throw new Error('Please select a scenario');
                     
                     response = await fetch('/matches/scenarios/run/', {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ path: scenarioPath })
                     });
                 }
                 
                 const result = await response.json();
-                
-                if (result.status !== 'ok') {
-                    throw new Error(result.message);
-                }
+                if (result.status !== 'ok') throw new Error(result.message);
                 
                 replayData = result.replay;
-                staticGrid = result.static_grid; // Backend should send this
+                staticGrid = result.static_grid;
                 
-                // Find scenario name for display
-                let name = 'Custom Scenario';
-                let desc = '';
-                if (sourceType.value === 'preset') {
-                    const selected = scenariosData.find(s => s.path === scenarioSelect.value);
-                    if (selected) {
-                        name = selected.name;
-                        desc = selected.description;
-                    }
-                }
-                
-                scenarioName.textContent = name;
-                scenarioDesc.textContent = desc;
+                // Update UI
+                scenarioName.textContent = path ? path.split('/').pop() : 'Simulation';
                 scenarioInfo.style.display = 'block';
                 
-                // Initialize visualizer
                 initVisualizer();
-                
             } catch (err) {
                 errorMsg.textContent = err.message;
                 errorMsg.style.display = 'block';
             } finally {
                 loadingMsg.style.display = 'none';
             }
-        });
+        }
 
         function initVisualizer() {
             canvas.classList.add('visible');
@@ -835,6 +814,13 @@
                     break;
             }
         });
+
+        // Auto-load from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const autoPath = urlParams.get('path');
+        if (autoPath) {
+            runScenario(autoPath);
+        }
 
         draw();
         requestAnimationFrame(animate);

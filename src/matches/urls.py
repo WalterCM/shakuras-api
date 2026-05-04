@@ -8,10 +8,10 @@ router.register('', views.MatchViewSet)
 app_name = 'matches'
 
 urlpatterns = [
-    path('editor/', views.MapEditorView.as_view(), name='map-editor'),
-    path('editor/save/', views.save_map_view, name='save-map'),
-    path('editor/maps/', views.list_maps_api, name='list-maps'),
-    path('editor/load/', views.load_map_api, name='load-map'),
+    path('editor/', views.UnifiedEditorView.as_view(), name='editor'),
+    path('editor/load/', views.load_scenario_api, name='editor-load'),
+    path('editor/save/', views.save_scenario_api, name='editor-save'),
+    path('editor/list/', views.list_scenarios_api, name='editor-list'),
     path('editor/reference/upload/', views.upload_reference_api, name='upload-reference'),
     path('editor/reference/', views.serve_reference_api, name='serve-reference'),
     path('scenarios/', views.ScenarioVisualizerView.as_view(), name='scenario-visualizer'),

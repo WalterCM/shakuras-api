@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shakuras - Unified Editor</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --bg-card: #1e293b;
+            --accent: #38bdf8;
+            --accent-glow: rgba(56, 189, 248, 0.4);
+            --text-main: #f8fafc;
+            --text-dim: #94a3b8;
+            --danger: #ef4444;
+            --success: #10b981;
+            --mineral: #34d399;
+            --p1-color: #3b82f6;
+            --p2-color: #ef4444;
+            --neutral-color: #eab308;
+        }
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            margin: 0;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* ===== Selection Screen ===== */
+        .selection-screen {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background: var(--bg-dark);
+            position: absolute;
+            width: 100%;
+            z-index: 100;
+        }
+        .selection-panel {
+            background: var(--bg-card);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 16px;
+            padding: 40px;
+            width: 600px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+        .selection-panel h1 {
+            font-size: 28px; font-weight: 600; margin: 0 0 8px 0;
+            background: linear-gradient(135deg, #fff, var(--accent));
+            background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .selection-panel p { color: var(--text-dim); margin: 0 0 28px 0; font-size: 14px; }
+        
+        .list-container {
+            display: flex; flex-direction: column; gap: 8px;
+            max-height: 400px; overflow-y: auto; padding-right: 8px;
+        }
+        .list-section-title { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.1em; margin: 12px 0 8px 0; }
+        .item-card {
+            background: rgba(15,23,42,0.5); border: 1px solid rgba(255,255,255,0.08);
+            padding: 10px 14px; border-radius: 10px;
+            display: flex; justify-content: space-between; align-items: center;
+            transition: all 0.2s;
+        }
+        .item-card:hover { border-color: var(--accent); background: rgba(56,189,248,0.08); }
+        .item-info { display: flex; flex-direction: column; gap: 2px; }
+        .item-name { font-weight: 600; font-size: 13px; }
+        .item-meta { font-size: 10px; color: var(--text-dim); }
+        
+        .badge {
+            padding: 4px 10px; border-radius: 6px; font-size: 10px; font-weight: 600; 
+            cursor: pointer; border: 1px solid rgba(255,255,255,0.1); transition: all 0.2s;
+        }
+        .badge.edit { background: rgba(255,255,255,0.05); color: white; }
+        .badge.edit:hover { background: var(--accent); color: var(--bg-dark); }
+        .badge.run { background: rgba(16,185,129,0.1); color: var(--success); border-color: rgba(16,185,129,0.2); }
+        .badge.run:hover { background: var(--success); color: white; }
+
+        /* ===== Editor Layout ===== */
+        .editor-layout { display: flex; height: 100vh; visibility: hidden; }
+        .sidebar {
+            width: 320px; background: var(--bg-card);
+            border-right: 1px solid rgba(255,255,255,0.1);
+            padding: 20px; display: flex; flex-direction: column; gap: 16px;
+            box-shadow: 4px 0 20px rgba(0,0,0,0.3); z-index: 10; overflow-y: auto;
+        }
+        .sidebar h1 { font-size: 20px; font-weight: 600; margin: 0; }
+        
+        .control-group { display: flex; flex-direction: column; gap: 6px; }
+        label { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+        input[type="text"], input[type="number"] {
+            background: rgba(15,23,42,0.5); border: 1px solid rgba(255,255,255,0.1);
+            padding: 8px 12px; border-radius: 6px; color: white; font-family: inherit; font-size: 13px;
+        }
+
+        .palette-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+        .palette-item {
+            background: rgba(15,23,42,0.3); border: 1px solid rgba(255,255,255,0.05);
+            padding: 8px 2px; border-radius: 8px; color: var(--text-dim); cursor: pointer;
+            transition: all 0.2s; display: flex; flex-direction: column; align-items: center; gap: 4px;
+        }
+        .palette-item:hover { border-color: var(--accent); color: white; }
+        .palette-item.active { border-color: var(--accent); background: var(--accent); color: var(--bg-dark); font-weight: 600; }
+        .palette-item .icon { width: 24px; height: 24px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; }
+
+        .owner-selector { display: flex; gap: 4px; }
+        .owner-btn {
+            flex: 1; padding: 6px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.05);
+            background: rgba(15,23,42,0.5); color: var(--text-dim); cursor: pointer; font-size: 9px; font-weight: 600;
+        }
+        .owner-btn.active.p1 { background: var(--p1-color); color: white; }
+        .owner-btn.active.p2 { background: var(--p2-color); color: white; }
+        .owner-btn.active.neutral { background: var(--neutral-color); color: white; }
+
+        .inspector {
+            background: rgba(15,23,42,0.5); border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 8px; padding: 10px; font-size: 11px;
+        }
+
+        .editor-container {
+            flex: 1; position: relative; background: #020617;
+            display: flex; align-items: center; justify-content: center; overflow: hidden;
+        }
+        #editor-canvas { background: #0f172a; cursor: crosshair; }
+
+        .toggle-row { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--text-dim); }
+        .toggle-row input { cursor: pointer; }
+
+        .btn-group { display: flex; flex-direction: column; gap: 8px; margin-top: auto; }
+        .primary-btn {
+            background: var(--accent); color: var(--bg-dark); border: none;
+            padding: 12px; border-radius: 10px; font-weight: 600; cursor: pointer;
+        }
+        .run-btn {
+            background: var(--success); color: white; border: none;
+            padding: 12px; border-radius: 10px; font-weight: 600; cursor: pointer;
+            display: none; transition: all 0.2s;
+        }
+        .run-btn:hover { background: #059669; transform: scale(1.02); }
+        .secondary-btn {
+            background: rgba(255,255,255,0.05); color: white; border: 1px solid rgba(255,255,255,0.1);
+            padding: 10px; border-radius: 8px; cursor: pointer; font-size: 12px;
+        }
+
+        .status-overlay {
+            position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%);
+            background: rgba(15,23,42,0.85); backdrop-filter: blur(8px);
+            padding: 6px 20px; border-radius: 20px; font-size: 11px;
+            color: var(--text-dim); border: 1px solid rgba(255,255,255,0.1);
+            display: flex; gap: 20px; pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+<!-- ===== SELECTION SCREEN ===== -->
+<div id="screen-select" class="selection-screen">
+    <div class="selection-panel">
+        <h1>Shakuras Editor</h1>
+        <p>Manage maps and tactical scenarios.</p>
+        
+        <div style="display: flex; justify-content: center; margin-bottom: 24px;">
+            <button class="primary-btn" style="width: 200px;" onclick="startNew(128, 128)">+ New from Scratch</button>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+            <div>
+                <div class="list-section-title">Base Maps</div>
+                <div id="map-list" class="list-container"></div>
+            </div>
+            <div>
+                <div class="list-section-title">Tactical Scenarios</div>
+                <div id="scenario-list" class="list-container"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== EDITOR SCREEN ===== -->
+<div id="screen-editor" class="editor-layout">
+    <div class="sidebar">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h1>Editor</h1>
+            <div style="font-size: 10px; color: var(--text-dim); cursor: pointer;" onclick="location.reload()">Exit</div>
+        </div>
+
+        <div class="control-group">
+            <label>Filename</label>
+            <input type="text" id="file-name" value="New_Asset">
+        </div>
+
+        <div class="control-group">
+            <label>Tool Palette</label>
+            <div class="owner-selector">
+                <button class="owner-btn p1 active" onclick="setOwner('p1')">P1</button>
+                <button class="owner-btn p2" onclick="setOwner('p2')">P2</button>
+                <button class="owner-btn neutral" onclick="setOwner('neutral')">N</button>
+            </div>
+            <div id="unit-palette" class="palette-grid" style="margin-top: 8px;"></div>
+        </div>
+
+        <div class="control-group">
+            <label>View Options</label>
+            <div class="toggle-row">
+                <span>Snap to Grid</span>
+                <input type="checkbox" id="snap-grid" checked>
+            </div>
+            <div class="toggle-row">
+                <span>Show Collisions (C)</span>
+                <input type="checkbox" id="show-collisions">
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label>Inspector</label>
+            <div id="inspector" class="inspector">
+                <div id="ins-name" style="color: var(--accent); font-weight: bold; margin-bottom: 5px;">No Selection</div>
+                <div id="ins-orders"></div>
+            </div>
+        </div>
+
+        <div class="control-group" style="border-top: 1px solid rgba(255,255,255,0.05); padding-top: 10px;">
+            <label>Tracing / Reference</label>
+            <input type="file" id="ref-input" accept="image/*" style="font-size: 9px;">
+            <div style="display: flex; align-items: center; gap: 5px; margin-top: 5px;">
+                <label style="font-size: 9px;">Opacity</label>
+                <input type="range" id="ref-opacity" min="0" max="1" step="0.1" value="0.3" style="flex: 1;">
+            </div>
+        </div>
+
+        <div class="btn-group">
+            <button id="run-btn" class="run-btn" onclick="save(true)">▶ Run Scenario</button>
+            <button class="primary-btn" onclick="save(false)">Save Asset</button>
+            <div style="font-size: 9px; color: var(--text-dim); text-align: center;">Ctrl+Z Undo | Ctrl+Y Redo | ESC Select</div>
+        </div>
+    </div>
+
+    <div class="editor-container">
+        <canvas id="editor-canvas"></canvas>
+        <div class="status-overlay">
+            <span>COORD: <b id="ui-coord">0, 0</b></span>
+            <span>ZOOM: <b id="ui-zoom">4.0x</b></span>
+            <span>MODE: <b id="ui-mode">SELECT</b></span>
+        </div>
+    </div>
+</div>
+
+{{ unit_definitions|json_script:"unit_definitions" }}
+
+<script>
+    const UNIT_DEFS = JSON.parse(document.getElementById('unit_definitions').textContent);
+    const canvas = document.getElementById('editor-canvas');
+    const ctx = canvas.getContext('2d');
+    
+    let entities = [], triggers = [], selectedId = null, currentTool = 'cursor', currentOwner = 'neutral';
+    let scale = 4, offsetX = 0, offsetY = 0, isPanning = false, lastMousePos = { x: 0, y: 0 };
+    let mapW = 128, mapH = 128, currentPath = null;
+    let mouseWorldPos = { x: 0, y: 0 };
+    
+    // Undo/Redo Stacks
+    let undoStack = [], redoStack = [];
+    function saveState() {
+        undoStack.push(JSON.stringify({ entities, triggers }));
+        if (undoStack.length > 50) undoStack.shift();
+        redoStack = [];
+    }
+    function undo() { if (undoStack.length <= 1) return; redoStack.push(undoStack.pop()); const state = JSON.parse(undoStack[undoStack.length - 1]); entities = state.entities; triggers = state.triggers; updateInspector(); updateUI(); }
+    function redo() { if (redoStack.length === 0) return; const stateStr = redoStack.pop(); undoStack.push(stateStr); const state = JSON.parse(stateStr); entities = state.entities; triggers = state.triggers; updateInspector(); updateUI(); }
+
+    // Reference Image
+    let refImage = null, refImageFilename = null, refOpacity = 0.3;
+
+    function initPalette() {
+        // 'cursor' is the first tool
+        const types = ['cursor', 'mineral_patch', 'base', 'worker', 'marine', 'zealot', 'zergling', 'tank', 'delete'];
+        document.getElementById('unit-palette').innerHTML = types.map(t => {
+            const isCursor = t === 'cursor';
+            const isDelete = t === 'delete';
+            const color = isCursor ? '#38bdf8' : (isDelete ? '#ef4444' : '#475569');
+            const icon = isCursor ? '⇖' : (isDelete ? '×' : t[0].toUpperCase());
+            
+            return `
+                <div class="palette-item ${t === currentTool ? 'active' : ''}" onclick="setTool('${t}')">
+                    <div class="icon" style="background: ${color}">${icon}</div>
+                    <span style="font-size: 8px;">${isCursor ? 'Select' : t.slice(0, 5)}</span>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function setTool(t) { 
+        currentTool = t; 
+        initPalette(); 
+        document.getElementById('ui-mode').textContent = t.toUpperCase();
+    }
+    
+    function setOwner(o) { currentOwner = o; document.querySelectorAll('.owner-btn').forEach(b => b.classList.toggle('active', b.innerText.toLowerCase() === (o === 'neutral' ? 'n' : o))); }
+
+    function screenToWorld(sx, sy) {
+        const r = canvas.getBoundingClientRect();
+        return { x: (sx - r.left - canvas.width/2 - offsetX) / scale, y: (sy - r.top - canvas.height/2 - offsetY) / scale };
+    }
+
+    function draw() {
+        ctx.setTransform(1,0,0,1,0,0);
+        ctx.fillStyle = '#020617'; ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.translate(canvas.width/2 + offsetX, canvas.height/2 + offsetY);
+        ctx.scale(scale, scale);
+
+        ctx.fillStyle = '#0f172a'; ctx.fillRect(0,0,mapW,mapH);
+
+        if (refImage && refImage.complete && refImage.naturalWidth > 0) {
+            try {
+                ctx.globalAlpha = refOpacity;
+                ctx.drawImage(refImage, 0, 0, mapW, mapH);
+                ctx.globalAlpha = 1.0;
+            } catch(e) {}
+        }
+
+        // Grid
+        ctx.strokeStyle = 'rgba(255,255,255,0.03)'; ctx.lineWidth = 0.5/scale;
+        ctx.beginPath();
+        for(let i=0; i<=mapW; i++) { ctx.moveTo(i,0); ctx.lineTo(i,mapH); }
+        for(let i=0; i<=mapH; i++) { ctx.moveTo(0,i); ctx.lineTo(mapW,i); }
+        ctx.stroke();
+
+        ctx.strokeStyle = 'rgba(56,189,248,0.1)'; ctx.lineWidth = 1.5/scale;
+        ctx.beginPath();
+        for(let i=0; i<=mapW; i+=8) { ctx.moveTo(i,0); ctx.lineTo(i,mapH); }
+        for(let i=0; i<=mapH; i+=8) { ctx.moveTo(0,i); ctx.lineTo(mapW,i); }
+        ctx.stroke();
+
+        const showCollisions = document.getElementById('show-collisions').checked;
+
+        entities.forEach(e => {
+            const d = UNIT_DEFS[e.type];
+            ctx.fillStyle = e.owner === 'p1' ? '#3b82f6' : (e.owner === 'p2' ? '#ef4444' : '#eab308');
+            if (e.type === 'mineral_patch') ctx.fillStyle = '#34d399';
+            ctx.globalAlpha = 0.7; ctx.fillRect(e.x, e.y, d.width, d.height);
+            ctx.globalAlpha = 1.0;
+            if (e.id === selectedId) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 2/scale; ctx.strokeRect(e.x, e.y, d.width, d.height); }
+            
+            if (showCollisions) {
+                ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 1/scale;
+                ctx.strokeRect(e.x + 0.1, e.y + 0.1, d.width - 0.2, d.height - 0.2);
+            }
+        });
+
+        // Ghost Placement
+        if (currentTool !== 'cursor' && currentTool !== 'delete' && !isPanning) {
+            const d = UNIT_DEFS[currentTool];
+            const snap = document.getElementById('snap-grid').checked;
+            const gx = snap ? Math.floor(mouseWorldPos.x) : mouseWorldPos.x - d.width/2;
+            const gy = snap ? Math.floor(mouseWorldPos.y) : mouseWorldPos.y - d.height/2;
+            ctx.fillStyle = currentOwner === 'p1' ? '#3b82f6' : (currentOwner === 'p2' ? '#ef4444' : '#eab308');
+            if (currentTool === 'mineral_patch') ctx.fillStyle = '#34d399';
+            ctx.globalAlpha = 0.4; ctx.fillRect(gx, gy, d.width, d.height);
+            ctx.globalAlpha = 1.0;
+        }
+
+        triggers.forEach(t => {
+            const e = entities.find(ent => ent.id === t.entity);
+            if (!e) return;
+            const d = UNIT_DEFS[e.type];
+            ctx.beginPath(); ctx.setLineDash([1,1]); ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1/scale;
+            ctx.moveTo(e.x + d.width/2, e.y + d.height/2);
+            if (t.action.target) ctx.lineTo(t.action.target.x, t.action.target.y);
+            else if (t.action.target_id) { const tar = entities.find(ent => ent.id === t.action.target_id); if (tar) ctx.lineTo(tar.x, tar.y); }
+            ctx.stroke(); ctx.setLineDash([]);
+        });
+
+        requestAnimationFrame(draw);
+    }
+
+    canvas.addEventListener('mousedown', (e) => {
+        const r = canvas.getBoundingClientRect();
+        const sx = e.clientX - r.left, sy = e.clientY - r.top;
+        if (e.button === 1 || (e.button === 0 && e.shiftKey)) { isPanning = true; lastMousePos = { x: sx, y: sy }; return; }
+
+        const w = screenToWorld(e.clientX, e.clientY);
+        
+        // Right click logic
+        if (e.button === 2) {
+            if (currentTool !== 'cursor') {
+                // If we were "painting", right click switches back to cursor (Select mode)
+                setTool('cursor');
+                return;
+            }
+            
+            // If in cursor mode, right click gives orders
+            if (selectedId) {
+                const ent = entities.find(ent => ent.id === selectedId);
+                if (!ent || ent.owner === 'neutral') return;
+                let tar = entities.find(ent => { const d = UNIT_DEFS[ent.type]; return w.x >= ent.x && w.x <= ent.x + d.width && w.y >= ent.y && w.y <= ent.y + d.height; });
+                triggers = triggers.filter(t => !(t.entity === selectedId && t.tick === 0));
+                if (tar) triggers.push({ tick: 0, entity: selectedId, action: { type: tar.type === 'mineral_patch' ? 'gather' : (tar.owner !== ent.owner ? 'attack' : 'move'), target_id: tar.id } });
+                else triggers.push({ tick: 0, entity: selectedId, action: { type: 'move', target: { x: w.x, y: w.y } } });
+                saveState(); updateInspector();
+            }
+            return;
+        }
+
+        if (e.button === 0) {
+            if (currentTool === 'cursor') {
+                // Selection logic
+                let clicked = entities.find(ent => { const d = UNIT_DEFS[ent.type]; return w.x >= ent.x && w.x <= ent.x + d.width && w.y >= ent.y && w.y <= ent.y + d.height; });
+                selectedId = clicked ? clicked.id : null;
+                updateInspector();
+            } else if (currentTool === 'delete') {
+                const prevLen = entities.length;
+                entities = entities.filter(ent => {
+                    const d = UNIT_DEFS[ent.type];
+                    return !(w.x >= ent.x && w.x <= ent.x + d.width && w.y >= ent.y && w.y <= ent.y + d.height);
+                });
+                if (entities.length !== prevLen) saveState();
+            } else {
+                // Placement logic
+                const snap = document.getElementById('snap-grid').checked;
+                const d = UNIT_DEFS[currentTool];
+                const px = snap ? Math.floor(w.x) : w.x - d.width/2;
+                const py = snap ? Math.floor(w.y) : w.y - d.height/2;
+                entities.push({ id: `${currentTool}_${Date.now()}`, type: currentTool, owner: currentOwner, x: px, y: py });
+                selectedId = entities[entities.length-1].id; saveState(); updateInspector();
+            }
+        }
+        updateUI();
+    });
+
+    window.addEventListener('mousemove', (e) => {
+        const r = canvas.getBoundingClientRect();
+        const sx = e.clientX - r.left, sy = e.clientY - r.top;
+        const world = screenToWorld(e.clientX, e.clientY);
+        mouseWorldPos = world;
+        if (isPanning) { offsetX += sx - lastMousePos.x; offsetY += sy - lastMousePos.y; lastMousePos = { x: sx, y: sy }; }
+        else { document.getElementById('ui-coord').textContent = `${world.x.toFixed(1)}, ${world.y.toFixed(1)}`; }
+    });
+    window.addEventListener('mouseup', () => isPanning = false);
+    canvas.addEventListener('wheel', (e) => {
+        e.preventDefault(); const r = canvas.getBoundingClientRect(); const mx = e.clientX - r.left, my = e.clientY - r.top;
+        const wx = (mx - canvas.width/2 - offsetX) / scale, wy = (my - canvas.height/2 - offsetY) / scale;
+        scale = Math.max(0.5, Math.min(scale * (e.deltaY > 0 ? 0.9 : 1.1), 20));
+        offsetX = mx - canvas.width/2 - wx * scale; offsetY = my - canvas.height/2 - wy * scale;
+        updateUI();
+    });
+
+    window.addEventListener('keydown', (e) => {
+        if (e.ctrlKey && e.code === 'KeyZ') { e.preventDefault(); undo(); }
+        if (e.ctrlKey && e.code === 'KeyY') { e.preventDefault(); redo(); }
+        if (e.code === 'KeyC') { const cb = document.getElementById('show-collisions'); cb.checked = !cb.checked; }
+        if (e.code === 'Escape') { setTool('cursor'); }
+    });
+
+    function updateInspector() {
+        const e = entities.find(ent => ent.id === selectedId);
+        document.getElementById('ins-name').textContent = e ? `${e.type.toUpperCase()} (${e.owner})` : 'No Selection';
+        const t = triggers.filter(tr => tr.entity === selectedId);
+        document.getElementById('ins-orders').innerHTML = t.map(tr => `<div style="font-size:10px;">T${tr.tick}: ${tr.action.type.toUpperCase()}</div>`).join('');
+    }
+
+    function updateUI() {
+        document.getElementById('run-btn').style.display = triggers.length > 0 ? 'block' : 'none';
+        document.getElementById('ui-zoom').textContent = `${scale.toFixed(1)}x`;
+    }
+
+    async function refreshList() {
+        const res = await fetch('/matches/editor/list/'); const data = await res.json();
+        const maps = data.scenarios.filter(s => s.category === 'map');
+        const scens = data.scenarios.filter(s => s.category === 'scenario');
+        document.getElementById('map-list').innerHTML = maps.map(s => `<div class="item-card"><div class="item-info"><span class="item-name">${s.name}</span><span class="item-meta">${s.width}x${s.height}</span></div><button class="badge edit" onclick="openFile('${s.path}')">Edit</button></div>`).join('');
+        document.getElementById('scenario-list').innerHTML = scens.map(s => `<div class="item-card"><div class="item-info"><span class="item-name">${s.name}</span><span class="item-meta">${s.width}x${s.height}</span></div><div style="display:flex; gap:4px;"><button class="badge edit" onclick="openFile('${s.path}')">Edit</button><button class="badge run" onclick="window.location.href='/matches/scenarios/?path=${s.path}'">Run</button></div></div>`).join('');
+    }
+
+    async function openFile(path) {
+        const res = await fetch(`/matches/editor/load/?path=${encodeURIComponent(path)}`); const d = await res.json(); const s = d.scenario;
+        currentPath = path; document.getElementById('file-name').value = s.name; mapW = s.width; mapH = s.height; entities = s.entities || []; triggers = s.triggers || [];
+        if (s.reference_image) loadRefImage(s.reference_image);
+        undoStack = [JSON.stringify({ entities, triggers })]; redoStack = [];
+        document.getElementById('screen-select').style.display = 'none'; const ed = document.getElementById('screen-editor'); ed.style.visibility = 'visible'; ed.style.display = 'flex';
+        resize(); updateUI();
+    }
+
+    function loadRefImage(filename) { refImageFilename = filename; refImage = new Image(); refImage.src = `/matches/editor/reference/?path=${encodeURIComponent(filename)}`; }
+    document.getElementById('ref-input').onchange = async (e) => { const file = e.target.files[0]; if (!file) return; const fd = new FormData(); fd.append('image', file); const res = await fetch('/matches/editor/reference/upload/', { method: 'POST', body: fd }); const d = await res.json(); if (d.status === 'ok') loadRefImage(d.path); };
+    document.getElementById('ref-opacity').oninput = (e) => refOpacity = parseFloat(e.target.value);
+    async function save(run) { const p = { path: currentPath, name: document.getElementById('file-name').value, width: parseInt(document.getElementById('map-w').value), height: parseInt(document.getElementById('map-h').value), entities, triggers, reference_image: refImageFilename || undefined }; const res = await fetch('/matches/editor/save/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) }); const r = await res.json(); if (r.status === 'ok') { if (run) window.location.href = `/matches/scenarios/?path=${r.path}`; else alert('Saved!'); } }
+    function startNew(w,h) { mapW=w; mapH=h; entities=[]; triggers=[]; saveState(); document.getElementById('screen-select').style.display='none'; const ed=document.getElementById('screen-editor'); ed.style.visibility='visible'; ed.style.display='flex'; resize(); updateUI(); }
+    function resize() { canvas.width = canvas.parentElement.clientWidth; canvas.height = canvas.parentElement.clientHeight; }
+    window.onresize = resize; canvas.oncontextmenu = (e) => e.preventDefault();
+    initPalette(); refreshList(); resize(); draw();
+</script>
+</body>
+</html>

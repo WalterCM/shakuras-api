@@ -1,6 +1,6 @@
 from django.views.generic import DetailView, TemplateView
 from django.shortcuts import render
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic.base import View
 from django.core.files.uploadedfile import UploadedFile
@@ -37,9 +37,25 @@ class ReplayView(DetailView):
         return context
 
 
-class MapEditorView(TemplateView):
-    """Interactive map editor for designing layouts"""
-    template_name = 'matches/map_editor.html'
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['unit_definitions'] = UNIT_DEFINITIONS
+        return context
+
+
+class UnifiedEditorView(TemplateView):
+    """Unified editor for designing both maps and tactical scenarios"""
+    template_name = 'matches/scenario_editor.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['unit_definitions'] = UNIT_DEFINITIONS
+        return context
+
+
+class ScenarioEditorView(TemplateView):
+    """Unified editor for designing maps and tactical scenarios"""
+    template_name = 'matches/scenario_editor.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -157,19 +173,19 @@ def upload_reference_api(request):
 
 
 def serve_reference_api(request):
-    """Serve a reference image from maps/references/"""
-    from django.http import FileResponse
-    from matches.loader import MAPS_DIR
-    
-    filename = request.GET.get('name', '')
+    """Serve a reference image from the maps/references directory"""
+    filename = request.GET.get('path') or request.GET.get('filename')
     if not filename:
-        return JsonResponse({'status': 'error', 'message': 'No filename'}, status=400)
+        return JsonResponse({'status': 'error', 'message': 'No filename provided'}, status=400)
     
-    filepath = MAPS_DIR / 'references' / filename
-    if not filepath.exists() or not filepath.is_file():
-        return JsonResponse({'status': 'error', 'message': 'Not found'}, status=404)
+    from matches.loader import MAPS_DIR
+    full_path = MAPS_DIR / 'references' / filename
+    if not full_path.exists():
+        return HttpResponse(status=404)
     
-    return FileResponse(open(filepath, 'rb'))
+    import mimetypes
+    content_type, _ = mimetypes.guess_type(str(full_path))
+    return HttpResponse(full_path.read_bytes(), content_type=content_type)
 
 
 class ScenarioVisualizerView(TemplateView):
@@ -184,8 +200,82 @@ class ScenarioVisualizerView(TemplateView):
 
 
 def list_scenarios_api(request):
-    """API endpoint to list all available scenarios"""
-    return JsonResponse({'scenarios': list_scenarios()})
+    """API endpoint to list both maps and scenarios for the editor"""
+    from matches.loader import get_maps_list
+    return JsonResponse({'scenarios': get_maps_list()})
+
+
+def load_scenario_api(request):
+    """API endpoint to load a scenario's full data for editing"""
+    path_param = request.GET.get('path', '')
+    if not path_param:
+        return JsonResponse({'status': 'error', 'message': 'No path provided'}, status=400)
+    
+    try:
+        # Resolve from project root
+        root_dir = SCENARIOS_DIR.parent
+        
+        # If it's a relative path starting with maps/ or scenarios/, use it directly
+        if path_param.startswith('maps/') or path_param.startswith('scenarios/'):
+            full_path = (root_dir / path_param).resolve()
+        else:
+            # Fallback to searching
+            full_path = (SCENARIOS_DIR / path_param).resolve()
+            if not full_path.exists():
+                full_path = (MAPS_DIR / path_param).resolve()
+
+        if not full_path.exists() and not full_path.suffix:
+             full_path = full_path.with_suffix('.yaml')
+
+        if not full_path.exists():
+            return JsonResponse({'status': 'error', 'message': f'File not found: {path_param}'}, status=404)
+             
+        with open(full_path, 'r') as f:
+            data = yaml.safe_load(f)
+        return JsonResponse({'status': 'ok', 'scenario': data})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+
+@csrf_exempt
+def save_scenario_api(request):
+    """API endpoint to save a scenario/map. Routes to maps/ or scenarios/ based on triggers."""
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            has_triggers = len(data.get('triggers', [])) > 0
+            
+            # Determine base directory and filename
+            from matches.loader import MAPS_DIR
+            base_dir = SCENARIOS_DIR if has_triggers else MAPS_DIR
+            
+            scenario_path = data.get('path')
+            if not scenario_path:
+                name_slug = data.get('name', 'new_file').replace(' ', '_').lower()
+                scenario_path = f"{name_slug}.yaml"
+            
+            # If path was from maps/ but now has triggers, move to scenarios/
+            # (Or vice versa) - but for now just resolve name
+            filename = Path(scenario_path).name
+            full_path = base_dir / filename
+            
+            yaml_content = {
+                'name': data.get('name', 'New Scenario'),
+                'width': data.get('width', 128),
+                'height': data.get('height', 128),
+                'entities': data.get('entities', []),
+                'triggers': data.get('triggers', []),
+            }
+            
+            with open(full_path, 'w') as f:
+                yaml.dump(yaml_content, f, default_flow_style=False, sort_keys=False)
+            
+            # Return relative path for the frontend
+            rel_path = f"scenarios/{filename}" if has_triggers else f"maps/{filename}"
+            return JsonResponse({'status': 'ok', 'path': rel_path})
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+    return JsonResponse({'status': 'error', 'message': 'Only POST allowed'}, status=405)
 
 
 @csrf_exempt
@@ -196,13 +286,20 @@ def run_scenario_api(request):
             data = json.loads(request.body)
             scenario_path = data.get('path', '')
             
-            # Validate path to prevent directory traversal
-            full_path = (SCENARIOS_DIR / scenario_path).resolve()
-            if not str(full_path).startswith(str(SCENARIOS_DIR.resolve())):
-                return JsonResponse({'status': 'error', 'message': 'Invalid path'}, status=400)
+            # Resolve from project root
+            root_dir = SCENARIOS_DIR.parent
+            if scenario_path.startswith('maps/') or scenario_path.startswith('scenarios/'):
+                full_path = (root_dir / scenario_path).resolve()
+            else:
+                full_path = (SCENARIOS_DIR / scenario_path).resolve()
+                if not full_path.exists():
+                    full_path = (MAPS_DIR / scenario_path).resolve()
             
+            if not full_path.exists() and not full_path.suffix:
+                 full_path = full_path.with_suffix('.yaml')
+
             if not full_path.exists():
-                return JsonResponse({'status': 'error', 'message': 'Scenario not found'}, status=404)
+                return JsonResponse({'status': 'error', 'message': f'Scenario not found: {scenario_path}'}, status=404)
             
             result = run_scenario_from_file(full_path)
             return JsonResponse({
