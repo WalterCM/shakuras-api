@@ -1,14 +1,7 @@
 name: Blood Bath
-description: ''
 width: 64
 height: 64
-spawn_points:
-  p2:
-    x: 53
-    y: 55
-  p1:
-    x: 2
-    y: 6
+reference_image: 400px-Blood_Bath.jpg
 entities:
 - id: m1
   type: mineral_patch
@@ -40,11 +33,6 @@ entities:
   owner: neutral
   x: 8
   y: 1
-- id: m7
-  type: mineral_patch
-  owner: neutral
-  x: 9
-  y: 5
 - id: m8
   type: mineral_patch
   owner: neutral
@@ -85,4 +73,19 @@ entities:
   owner: neutral
   x: 61
   y: 58
-reference_image: 400px-Blood_Bath.jpg
+- id: base_1777872968784
+  type: base
+  owner: p1
+  x: 2
+  y: 6
+- id: base_1777872974567
+  type: base
+  owner: p2
+  x: 53
+  y: 55
+- id: mineral_patch_1777873419689
+  type: mineral_patch
+  owner: neutral
+  x: 9
+  y: 5
+triggers: []

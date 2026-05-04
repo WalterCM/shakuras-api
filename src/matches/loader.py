@@ -107,15 +107,15 @@ def _validate_map_data(data, path=None):
     if 'height' not in data:
         raise MapLoadError(f"Missing 'height' field{path_str}")
     
-    # Debe tener spawn_points O triggers (o ambos)
+    # Debe tener spawn_points O triggers O entities
     has_spawns = 'spawn_points' in data and data['spawn_points']
     has_triggers = 'triggers' in data and data['triggers']
     has_entities = 'entities' in data and data['entities']
     
-    if not has_spawns and not has_triggers:
+    if not has_spawns and not has_triggers and not has_entities:
         raise MapLoadError(
-            f"Map must have 'spawn_points' or 'triggers'{path_str}. "
-            f"Found: spawn_points={has_spawns}, triggers={has_triggers}"
+            f"Map must have 'spawn_points', 'triggers' or 'entities'{path_str}. "
+            f"Found none of them."
         )
     
     return True
@@ -128,26 +128,32 @@ def get_maps_list():
     # Maps en maps/
     if MAPS_DIR.exists():
         for yaml_file in MAPS_DIR.glob('*.yaml'):
-            data = _load_yaml(yaml_file)
-            maps.append({
-                'name': data.get('name', yaml_file.stem),
-                'path': f'maps/{yaml_file.name}',
-                'category': 'map',
-                'width': data.get('width'),
-                'height': data.get('height'),
-            })
+            try:
+                data = _load_yaml(yaml_file)
+                maps.append({
+                    'name': data.get('name', yaml_file.stem),
+                    'path': f'maps/{yaml_file.name}',
+                    'category': 'map',
+                    'width': data.get('width'),
+                    'height': data.get('height'),
+                })
+            except Exception as e:
+                print(f"Error loading map {yaml_file}: {e}")
     
     # Maps en scenarios/
     if SCENARIOS_DIR.exists():
         for yaml_file in SCENARIOS_DIR.glob('**/*.yaml'):
-            data = _load_yaml(yaml_file)
-            rel_path = yaml_file.relative_to(SCENARIOS_DIR.parent)
-            maps.append({
-                'name': data.get('name', yaml_file.stem),
-                'path': str(rel_path),
-                'category': 'scenario',
-                'width': data.get('width'),
-                'height': data.get('height'),
-            })
+            try:
+                data = _load_yaml(yaml_file)
+                rel_path = yaml_file.relative_to(SCENARIOS_DIR.parent)
+                maps.append({
+                    'name': data.get('name', yaml_file.stem),
+                    'path': str(rel_path),
+                    'category': 'scenario',
+                    'width': data.get('width'),
+                    'height': data.get('height'),
+                })
+            except Exception as e:
+                print(f"Error loading scenario {yaml_file}: {e}")
     
     return maps

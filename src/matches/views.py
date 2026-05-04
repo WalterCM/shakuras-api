@@ -4,6 +4,7 @@ from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic.base import View
 from django.core.files.uploadedfile import UploadedFile
+from pathlib import Path
 import json
 import yaml
 from rest_framework import viewsets, permissions
@@ -263,9 +264,13 @@ def save_scenario_api(request):
                 'name': data.get('name', 'New Scenario'),
                 'width': data.get('width', 128),
                 'height': data.get('height', 128),
+                'reference_image': data.get('reference_image'),
                 'entities': data.get('entities', []),
                 'triggers': data.get('triggers', []),
             }
+            # Remove reference_image if it's null/None
+            if not yaml_content['reference_image']:
+                del yaml_content['reference_image']
             
             with open(full_path, 'w') as f:
                 yaml.dump(yaml_content, f, default_flow_style=False, sort_keys=False)

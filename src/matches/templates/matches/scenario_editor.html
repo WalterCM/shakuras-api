@@ -85,40 +85,59 @@
         .sidebar {
             width: 320px; background: var(--bg-card);
             border-right: 1px solid rgba(255,255,255,0.1);
-            padding: 20px; display: flex; flex-direction: column; gap: 16px;
+            padding: 20px; display: flex; flex-direction: column; gap: 20px;
             box-shadow: 4px 0 20px rgba(0,0,0,0.3); z-index: 10; overflow-y: auto;
         }
-        .sidebar h1 { font-size: 20px; font-weight: 600; margin: 0; }
+        .sidebar h1 { font-size: 22px; font-weight: 600; margin: 0; }
         
-        .control-group { display: flex; flex-direction: column; gap: 6px; }
-        label { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+        .control-group { display: flex; flex-direction: column; gap: 8px; }
+        label { font-size: 11px; color: var(--accent); text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600; }
         input[type="text"], input[type="number"] {
-            background: rgba(15,23,42,0.5); border: 1px solid rgba(255,255,255,0.1);
-            padding: 8px 12px; border-radius: 6px; color: white; font-family: inherit; font-size: 13px;
+            background: rgba(15,23,42,0.6); border: 1px solid rgba(255,255,255,0.15);
+            padding: 10px 14px; border-radius: 8px; color: white; font-family: inherit; font-size: 14px;
         }
 
-        .palette-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
-        .palette-item {
-            background: rgba(15,23,42,0.3); border: 1px solid rgba(255,255,255,0.05);
-            padding: 8px 2px; border-radius: 8px; color: var(--text-dim); cursor: pointer;
-            transition: all 0.2s; display: flex; flex-direction: column; align-items: center; gap: 4px;
+        /* ===== System Tools Bar ===== */
+        .system-tools { display: flex; gap: 8px; }
+        .sys-btn {
+            flex: 1; padding: 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(15,23,42,0.5); color: white; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 12px; font-weight: 600;
         }
-        .palette-item:hover { border-color: var(--accent); color: white; }
+        .sys-btn.active { border-color: var(--accent); background: rgba(56,189,248,0.2); color: white; }
+        .sys-btn.delete.active { border-color: var(--danger); background: rgba(239,68,68,0.2); color: white; }
+
+        /* ===== Palette & Tabs ===== */
+        .category-tabs { display: flex; gap: 4px; background: rgba(15,23,42,0.5); padding: 4px; border-radius: 10px; }
+        .cat-tab {
+            flex: 1; padding: 8px; border-radius: 6px; border: none; background: transparent;
+            color: var(--text-dim); cursor: pointer; font-size: 10px; font-weight: 600; transition: all 0.2s;
+        }
+        .cat-tab.active { background: var(--bg-card); color: white; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+
+        .palette-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+        .palette-item {
+            background: rgba(15,23,42,0.3); border: 1px solid rgba(255,255,255,0.08);
+            padding: 12px 4px; border-radius: 12px; color: var(--text-main); cursor: pointer;
+            transition: all 0.2s; display: flex; flex-direction: column; align-items: center; gap: 6px;
+        }
+        .palette-item:hover { border-color: var(--accent); background: rgba(56,189,248,0.05); }
         .palette-item.active { border-color: var(--accent); background: var(--accent); color: var(--bg-dark); font-weight: 600; }
-        .palette-item .icon { width: 24px; height: 24px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; }
+        .palette-item .icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: bold; }
+        .palette-item span { font-size: 11px; font-weight: 500; text-align: center; line-height: 1.2; }
 
         .owner-selector { display: flex; gap: 4px; }
         .owner-btn {
-            flex: 1; padding: 6px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.05);
-            background: rgba(15,23,42,0.5); color: var(--text-dim); cursor: pointer; font-size: 9px; font-weight: 600;
+            flex: 1; padding: 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(15,23,42,0.5); color: var(--text-dim); cursor: pointer; font-size: 10px; font-weight: 600;
         }
         .owner-btn.active.p1 { background: var(--p1-color); color: white; }
         .owner-btn.active.p2 { background: var(--p2-color); color: white; }
         .owner-btn.active.neutral { background: var(--neutral-color); color: white; }
 
         .inspector {
-            background: rgba(15,23,42,0.5); border: 1px solid rgba(255,255,255,0.05);
-            border-radius: 8px; padding: 10px; font-size: 11px;
+            background: rgba(15,23,42,0.6); border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px; padding: 12px; font-size: 12px;
         }
 
         .editor-container {
@@ -127,31 +146,30 @@
         }
         #editor-canvas { background: #0f172a; cursor: crosshair; }
 
-        .toggle-row { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--text-dim); }
-        .toggle-row input { cursor: pointer; }
+        .toggle-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--text-main); }
+        .toggle-row input { width: 16px; height: 16px; cursor: pointer; }
 
         .btn-group { display: flex; flex-direction: column; gap: 8px; margin-top: auto; }
         .primary-btn {
             background: var(--accent); color: var(--bg-dark); border: none;
-            padding: 12px; border-radius: 10px; font-weight: 600; cursor: pointer;
+            padding: 14px; border-radius: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+            font-size: 14px;
         }
+        .primary-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        
         .run-btn {
             background: var(--success); color: white; border: none;
-            padding: 12px; border-radius: 10px; font-weight: 600; cursor: pointer;
-            display: none; transition: all 0.2s;
+            padding: 14px; border-radius: 12px; font-weight: 600; cursor: pointer;
+            display: none; transition: all 0.2s; font-size: 14px;
         }
         .run-btn:hover { background: #059669; transform: scale(1.02); }
-        .secondary-btn {
-            background: rgba(255,255,255,0.05); color: white; border: 1px solid rgba(255,255,255,0.1);
-            padding: 10px; border-radius: 8px; cursor: pointer; font-size: 12px;
-        }
 
         .status-overlay {
-            position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%);
-            background: rgba(15,23,42,0.85); backdrop-filter: blur(8px);
-            padding: 6px 20px; border-radius: 20px; font-size: 11px;
-            color: var(--text-dim); border: 1px solid rgba(255,255,255,0.1);
-            display: flex; gap: 20px; pointer-events: none;
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: rgba(15,23,42,0.9); backdrop-filter: blur(12px);
+            padding: 8px 24px; border-radius: 24px; font-size: 12px;
+            color: var(--text-main); border: 1px solid rgba(255,255,255,0.15);
+            display: flex; gap: 24px; pointer-events: none;
         }
     </style>
 </head>
@@ -164,7 +182,7 @@
         <p>Manage maps and tactical scenarios.</p>
         
         <div style="display: flex; justify-content: center; margin-bottom: 24px;">
-            <button class="primary-btn" style="width: 200px;" onclick="startNew(128, 128)">+ New from Scratch</button>
+            <button class="primary-btn" style="width: 240px;" onclick="startNew(128, 128)">+ Create New Map</button>
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
@@ -184,8 +202,8 @@
 <div id="screen-editor" class="editor-layout">
     <div class="sidebar">
         <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h1>Editor</h1>
-            <div style="font-size: 10px; color: var(--text-dim); cursor: pointer;" onclick="location.reload()">Exit</div>
+            <h1>Project</h1>
+            <div style="font-size: 11px; color: var(--danger); cursor: pointer; font-weight: 600;" onclick="location.reload()">EXIT</div>
         </div>
 
         <div class="control-group">
@@ -194,17 +212,41 @@
         </div>
 
         <div class="control-group">
-            <label>Tool Palette</label>
-            <div class="owner-selector">
-                <button class="owner-btn p1 active" onclick="setOwner('p1')">P1</button>
-                <button class="owner-btn p2" onclick="setOwner('p2')">P2</button>
-                <button class="owner-btn neutral" onclick="setOwner('neutral')">N</button>
+            <label>Map Size</label>
+            <div style="display: flex; gap: 8px;">
+                <input type="number" id="map-w" value="128" style="width: 50%;" title="Width">
+                <input type="number" id="map-h" value="128" style="width: 50%;" title="Height">
             </div>
-            <div id="unit-palette" class="palette-grid" style="margin-top: 8px;"></div>
         </div>
 
         <div class="control-group">
-            <label>View Options</label>
+            <label>Tools</label>
+            <div class="system-tools">
+                <button id="btn-cursor" class="sys-btn active" onclick="setTool('cursor')"><span>⇖</span> Select</button>
+                <button id="btn-delete" class="sys-btn delete" onclick="setTool('delete')"><span>×</span> Delete</button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label>Palette</label>
+            <div class="owner-selector">
+                <button id="owner-p1" class="owner-btn p1 active" onclick="setOwner('p1')">P1</button>
+                <button id="owner-p2" class="owner-btn p2" onclick="setOwner('p2')">P2</button>
+                <button id="owner-neutral" class="owner-btn neutral" onclick="setOwner('NEUTRAL')">NEUTRAL</button>
+            </div>
+            
+            <div class="category-tabs">
+                <button class="cat-tab active" onclick="setCategory('neutral')">NEUTRAL</button>
+                <button class="cat-tab" onclick="setCategory('terran')">TERRAN</button>
+                <button class="cat-tab" onclick="setCategory('protoss')">PROTOSS</button>
+                <button class="cat-tab" onclick="setCategory('zerg')">ZERG</button>
+            </div>
+
+            <div id="unit-palette" class="palette-grid"></div>
+        </div>
+
+        <div class="control-group">
+            <label>Options</label>
             <div class="toggle-row">
                 <span>Snap to Grid</span>
                 <input type="checkbox" id="snap-grid" checked>
@@ -218,33 +260,32 @@
         <div class="control-group">
             <label>Inspector</label>
             <div id="inspector" class="inspector">
-                <div id="ins-name" style="color: var(--accent); font-weight: bold; margin-bottom: 5px;">No Selection</div>
+                <div id="ins-name" style="color: var(--accent); font-weight: bold; margin-bottom: 5px; font-size: 14px;">No Selection</div>
                 <div id="ins-orders"></div>
             </div>
         </div>
 
         <div class="control-group" style="border-top: 1px solid rgba(255,255,255,0.05); padding-top: 10px;">
-            <label>Tracing / Reference</label>
-            <input type="file" id="ref-input" accept="image/*" style="font-size: 9px;">
-            <div style="display: flex; align-items: center; gap: 5px; margin-top: 5px;">
-                <label style="font-size: 9px;">Opacity</label>
+            <label>Reference</label>
+            <input type="file" id="ref-input" accept="image/*" style="font-size: 10px;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+                <label style="font-size: 10px; color: var(--text-dim);">Opacity</label>
                 <input type="range" id="ref-opacity" min="0" max="1" step="0.1" value="0.3" style="flex: 1;">
             </div>
         </div>
 
         <div class="btn-group">
-            <button id="run-btn" class="run-btn" onclick="save(true)">▶ Run Scenario</button>
-            <button class="primary-btn" onclick="save(false)">Save Asset</button>
-            <div style="font-size: 9px; color: var(--text-dim); text-align: center;">Ctrl+Z Undo | Ctrl+Y Redo | ESC Select</div>
+            <button id="run-btn" class="run-btn" onclick="save(true)">▶ Test Scenario</button>
+            <button id="save-btn" class="primary-btn" onclick="save(false)">Save Changes</button>
         </div>
     </div>
 
     <div class="editor-container">
         <canvas id="editor-canvas"></canvas>
         <div class="status-overlay">
-            <span>COORD: <b id="ui-coord">0, 0</b></span>
-            <span>ZOOM: <b id="ui-zoom">4.0x</b></span>
-            <span>MODE: <b id="ui-mode">SELECT</b></span>
+            <span>COORD: <b id="ui-coord" style="color: var(--accent);">0, 0</b></span>
+            <span>ZOOM: <b id="ui-zoom" style="color: var(--accent);">4.0x</b></span>
+            <span>MODE: <b id="ui-mode" style="color: var(--accent);">SELECT</b></span>
         </div>
     </div>
 </div>
@@ -256,7 +297,7 @@
     const canvas = document.getElementById('editor-canvas');
     const ctx = canvas.getContext('2d');
     
-    let entities = [], triggers = [], selectedId = null, currentTool = 'cursor', currentOwner = 'neutral';
+    let entities = [], triggers = [], selectedId = null, currentTool = 'cursor', currentOwner = 'p1', currentCategory = 'neutral';
     let scale = 4, offsetX = 0, offsetY = 0, isPanning = false, lastMousePos = { x: 0, y: 0 };
     let mapW = 128, mapH = 128, currentPath = null;
     let mouseWorldPos = { x: 0, y: 0 };
@@ -274,31 +315,65 @@
     // Reference Image
     let refImage = null, refImageFilename = null, refOpacity = 0.3;
 
+    const ENTITY_CATEGORIES = {
+        neutral: ['mineral_patch', 'base'],
+        terran: ['worker', 'marine', 'tank'],
+        protoss: ['zealot'],
+        zerg: ['zergling']
+    };
+
+    const FRIENDLY_NAMES = {
+        'mineral_patch': 'Mineral Patch',
+        'base': 'Start Location',
+        'worker': 'Worker',
+        'marine': 'Marine',
+        'zealot': 'Zealot',
+        'zergling': 'Zergling',
+        'tank': 'Siege Tank',
+        'cursor': 'Selection',
+        'delete': 'Delete Tool'
+    };
+
     function initPalette() {
-        // 'cursor' is the first tool
-        const types = ['cursor', 'mineral_patch', 'base', 'worker', 'marine', 'zealot', 'zergling', 'tank', 'delete'];
+        const types = ENTITY_CATEGORIES[currentCategory];
         document.getElementById('unit-palette').innerHTML = types.map(t => {
-            const isCursor = t === 'cursor';
-            const isDelete = t === 'delete';
-            const color = isCursor ? '#38bdf8' : (isDelete ? '#ef4444' : '#475569');
-            const icon = isCursor ? '⇖' : (isDelete ? '×' : t[0].toUpperCase());
-            
+            const name = FRIENDLY_NAMES[t] || t;
+            const icon = t === 'base' ? 'S' : t[0].toUpperCase();
             return `
                 <div class="palette-item ${t === currentTool ? 'active' : ''}" onclick="setTool('${t}')">
-                    <div class="icon" style="background: ${color}">${icon}</div>
-                    <span style="font-size: 8px;">${isCursor ? 'Select' : t.slice(0, 5)}</span>
+                    <div class="icon" style="background: #475569">${icon}</div>
+                    <span>${name}</span>
                 </div>
             `;
         }).join('');
+        
+        document.getElementById('btn-cursor').classList.toggle('active', currentTool === 'cursor');
+        document.getElementById('btn-delete').classList.toggle('active', currentTool === 'delete');
+    }
+
+    function setCategory(cat) {
+        currentCategory = cat;
+        document.querySelectorAll('.cat-tab').forEach(t => t.classList.toggle('active', t.innerText.toLowerCase() === cat));
+        if (cat === 'neutral') setOwner('neutral');
+        else if (currentOwner === 'neutral') setOwner('p1');
+        initPalette();
     }
 
     function setTool(t) { 
         currentTool = t; 
         initPalette(); 
-        document.getElementById('ui-mode').textContent = t.toUpperCase();
+        document.getElementById('ui-mode').textContent = (FRIENDLY_NAMES[t] || t).toUpperCase();
+        if (t === 'mineral_patch') setOwner('neutral');
+        else if (t !== 'cursor' && t !== 'delete' && currentOwner === 'neutral') setOwner('p1');
     }
     
-    function setOwner(o) { currentOwner = o; document.querySelectorAll('.owner-btn').forEach(b => b.classList.toggle('active', b.innerText.toLowerCase() === (o === 'neutral' ? 'n' : o))); }
+    function setOwner(o) { 
+        currentOwner = o; 
+        document.querySelectorAll('.owner-btn').forEach(b => {
+            const pid = b.id.replace('owner-', '');
+            b.classList.toggle('active', pid === o);
+        });
+    }
 
     function screenToWorld(sx, sy) {
         const r = canvas.getBoundingClientRect();
@@ -380,18 +455,10 @@
         const r = canvas.getBoundingClientRect();
         const sx = e.clientX - r.left, sy = e.clientY - r.top;
         if (e.button === 1 || (e.button === 0 && e.shiftKey)) { isPanning = true; lastMousePos = { x: sx, y: sy }; return; }
-
         const w = screenToWorld(e.clientX, e.clientY);
         
-        // Right click logic
         if (e.button === 2) {
-            if (currentTool !== 'cursor') {
-                // If we were "painting", right click switches back to cursor (Select mode)
-                setTool('cursor');
-                return;
-            }
-            
-            // If in cursor mode, right click gives orders
+            if (currentTool !== 'cursor') { setTool('cursor'); return; }
             if (selectedId) {
                 const ent = entities.find(ent => ent.id === selectedId);
                 if (!ent || ent.owner === 'neutral') return;
@@ -406,19 +473,14 @@
 
         if (e.button === 0) {
             if (currentTool === 'cursor') {
-                // Selection logic
                 let clicked = entities.find(ent => { const d = UNIT_DEFS[ent.type]; return w.x >= ent.x && w.x <= ent.x + d.width && w.y >= ent.y && w.y <= ent.y + d.height; });
                 selectedId = clicked ? clicked.id : null;
                 updateInspector();
             } else if (currentTool === 'delete') {
                 const prevLen = entities.length;
-                entities = entities.filter(ent => {
-                    const d = UNIT_DEFS[ent.type];
-                    return !(w.x >= ent.x && w.x <= ent.x + d.width && w.y >= ent.y && w.y <= ent.y + d.height);
-                });
+                entities = entities.filter(ent => { const d = UNIT_DEFS[ent.type]; return !(w.x >= ent.x && w.x <= ent.x + d.width && w.y >= ent.y && w.y <= ent.y + d.height); });
                 if (entities.length !== prevLen) saveState();
             } else {
-                // Placement logic
                 const snap = document.getElementById('snap-grid').checked;
                 const d = UNIT_DEFS[currentTool];
                 const px = snap ? Math.floor(w.x) : w.x - d.width/2;
@@ -456,9 +518,9 @@
 
     function updateInspector() {
         const e = entities.find(ent => ent.id === selectedId);
-        document.getElementById('ins-name').textContent = e ? `${e.type.toUpperCase()} (${e.owner})` : 'No Selection';
+        document.getElementById('ins-name').textContent = e ? `${(FRIENDLY_NAMES[e.type] || e.type).toUpperCase()} (${e.owner})` : 'No Selection';
         const t = triggers.filter(tr => tr.entity === selectedId);
-        document.getElementById('ins-orders').innerHTML = t.map(tr => `<div style="font-size:10px;">T${tr.tick}: ${tr.action.type.toUpperCase()}</div>`).join('');
+        document.getElementById('ins-orders').innerHTML = t.map(tr => `<div style="font-size:11px; margin-bottom:4px; border-left:2px solid var(--accent); padding-left:8px;">T${tr.tick}: ${tr.action.type.toUpperCase()}</div>`).join('');
     }
 
     function updateUI() {
@@ -467,26 +529,69 @@
     }
 
     async function refreshList() {
-        const res = await fetch('/matches/editor/list/'); const data = await res.json();
-        const maps = data.scenarios.filter(s => s.category === 'map');
-        const scens = data.scenarios.filter(s => s.category === 'scenario');
-        document.getElementById('map-list').innerHTML = maps.map(s => `<div class="item-card"><div class="item-info"><span class="item-name">${s.name}</span><span class="item-meta">${s.width}x${s.height}</span></div><button class="badge edit" onclick="openFile('${s.path}')">Edit</button></div>`).join('');
-        document.getElementById('scenario-list').innerHTML = scens.map(s => `<div class="item-card"><div class="item-info"><span class="item-name">${s.name}</span><span class="item-meta">${s.width}x${s.height}</span></div><div style="display:flex; gap:4px;"><button class="badge edit" onclick="openFile('${s.path}')">Edit</button><button class="badge run" onclick="window.location.href='/matches/scenarios/?path=${s.path}'">Run</button></div></div>`).join('');
+        try {
+            const res = await fetch('/matches/editor/list/'); const data = await res.json();
+            const maps = data.scenarios.filter(s => s.category === 'map');
+            const scens = data.scenarios.filter(s => s.category === 'scenario');
+            document.getElementById('map-list').innerHTML = maps.map(s => `<div class="item-card"><div class="item-info"><span class="item-name">${s.name || 'Unnamed'}</span><span class="item-meta">${s.width}x${s.height}</span></div><button class="badge edit" onclick="openFile('${s.path}')">Edit</button></div>`).join('') || '<div style="font-size:10px; color:var(--text-dim); padding:10px;">No maps found</div>';
+            document.getElementById('scenario-list').innerHTML = scens.map(s => `<div class="item-card"><div class="item-info"><span class="item-name">${s.name || 'Unnamed'}</span><span class="item-meta">${s.width}x${s.height}</span></div><div style="display:flex; gap:4px;"><button class="badge edit" onclick="openFile('${s.path}')">Edit</button><button class="badge run" onclick="window.location.href='/matches/scenarios/?path=${s.path}'">Run</button></div></div>`).join('') || '<div style="font-size:10px; color:var(--text-dim); padding:10px;">No scenarios found</div>';
+        } catch (err) { console.error("Error refreshing list:", err); }
     }
 
     async function openFile(path) {
-        const res = await fetch(`/matches/editor/load/?path=${encodeURIComponent(path)}`); const d = await res.json(); const s = d.scenario;
-        currentPath = path; document.getElementById('file-name').value = s.name; mapW = s.width; mapH = s.height; entities = s.entities || []; triggers = s.triggers || [];
-        if (s.reference_image) loadRefImage(s.reference_image);
-        undoStack = [JSON.stringify({ entities, triggers })]; redoStack = [];
-        document.getElementById('screen-select').style.display = 'none'; const ed = document.getElementById('screen-editor'); ed.style.visibility = 'visible'; ed.style.display = 'flex';
-        resize(); updateUI();
+        const res = await fetch(`/matches/editor/load/?path=${encodeURIComponent(path)}`);
+        const d = await res.json();
+        const s = d.scenario;
+        
+        currentPath = path;
+        document.getElementById('file-name').value = s.name || 'Unnamed';
+        document.getElementById('map-w').value = s.width || 128;
+        document.getElementById('map-h').value = s.height || 128;
+        
+        mapW = s.width || 128;
+        mapH = s.height || 128;
+        entities = s.entities || [];
+        triggers = s.triggers || [];
+        
+        if (s.reference_image) {
+            loadRefImage(s.reference_image);
+        } else {
+            refImage = null;
+            refImageFilename = null;
+        }
+
+        undoStack = [JSON.stringify({ entities, triggers })];
+        redoStack = [];
+        
+        document.getElementById('screen-select').style.display = 'none';
+        const ed = document.getElementById('screen-editor');
+        ed.style.visibility = 'visible';
+        ed.style.display = 'flex';
+        
+        // Reset camera to center the new map
+        offsetX = 0;
+        offsetY = 0;
+        scale = 4;
+        
+        resize();
+        updateUI();
     }
 
     function loadRefImage(filename) { refImageFilename = filename; refImage = new Image(); refImage.src = `/matches/editor/reference/?path=${encodeURIComponent(filename)}`; }
     document.getElementById('ref-input').onchange = async (e) => { const file = e.target.files[0]; if (!file) return; const fd = new FormData(); fd.append('image', file); const res = await fetch('/matches/editor/reference/upload/', { method: 'POST', body: fd }); const d = await res.json(); if (d.status === 'ok') loadRefImage(d.path); };
     document.getElementById('ref-opacity').oninput = (e) => refOpacity = parseFloat(e.target.value);
-    async function save(run) { const p = { path: currentPath, name: document.getElementById('file-name').value, width: parseInt(document.getElementById('map-w').value), height: parseInt(document.getElementById('map-h').value), entities, triggers, reference_image: refImageFilename || undefined }; const res = await fetch('/matches/editor/save/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) }); const r = await res.json(); if (r.status === 'ok') { if (run) window.location.href = `/matches/scenarios/?path=${r.path}`; else alert('Saved!'); } }
+    async function save(run) {
+        const saveBtn = document.getElementById('save-btn'); const originalText = saveBtn.innerText; saveBtn.disabled = true; saveBtn.innerText = 'Saving...';
+        try {
+            const p = { path: currentPath, name: document.getElementById('file-name').value, width: parseInt(document.getElementById('map-w').value), height: parseInt(document.getElementById('map-h').value), entities, triggers, reference_image: refImageFilename || undefined };
+            const res = await fetch('/matches/editor/save/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) });
+            const r = await res.json();
+            if (r.status === 'ok') { 
+                currentPath = r.path; if (run) window.location.href = `/matches/scenarios/?path=${r.path}`; 
+                else { saveBtn.innerText = 'Saved! ✓'; setTimeout(() => { saveBtn.innerText = originalText; saveBtn.disabled = false; }, 2000); }
+            } else throw new Error(r.message || 'Unknown error');
+        } catch (err) { alert('Save failed: ' + err.message); saveBtn.innerText = originalText; saveBtn.disabled = false; }
+    }
     function startNew(w,h) { mapW=w; mapH=h; entities=[]; triggers=[]; saveState(); document.getElementById('screen-select').style.display='none'; const ed=document.getElementById('screen-editor'); ed.style.visibility='visible'; ed.style.display='flex'; resize(); updateUI(); }
     function resize() { canvas.width = canvas.parentElement.clientWidth; canvas.height = canvas.parentElement.clientHeight; }
     window.onresize = resize; canvas.oncontextmenu = (e) => e.preventDefault();
