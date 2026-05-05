@@ -1213,7 +1213,7 @@
             height: mapH, 
             entities, 
             triggers,
-            config: { max_ticks: 100 } // Always ensure at least 100 ticks for preview
+            config: { max_ticks: 300 } // Enough for a full mining cycle (80 harvest + travel)
         };
         try {
             const res = await fetch('/matches/editor/run/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) });

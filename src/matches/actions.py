@@ -93,6 +93,7 @@ class GatherAction(Action):
         if dist <= arrival_threshold:
             # We are touching! Start mining
             self.phase = 'mining'
+            self.mining_cooldown = max(1, entity.harvest_time)
             entity.waypoints = []
             return
         # Pathfinding for long distances
@@ -127,6 +128,7 @@ class GatherAction(Action):
             # Someone else is mining - wait
             return
             
+        # Claim it if we were waiting
         # Claim it if we were waiting
         if patch.occupied_by is None:
             patch.occupied_by = entity.id

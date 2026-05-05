@@ -105,9 +105,9 @@ def execute_scenario(scenario_data):
     engine_map = create_engine_map_from_config(scenario_data)
     
     # 2. Create simulator
-    max_ticks = 100
+    max_ticks = 300
     if scenario_data.get('config') and isinstance(scenario_data['config'], dict):
-        max_ticks = scenario_data['config'].get('max_ticks', 100)
+        max_ticks = scenario_data['config'].get('max_ticks', 300)
         
     sim = MatchSimulator(
         DummyPlayer('p1'),
