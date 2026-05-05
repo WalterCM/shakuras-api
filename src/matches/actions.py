@@ -3,7 +3,7 @@ Action system for unit behaviors.
 Each action class represents a command button in StarCraft.
 """
 from abc import ABC, abstractmethod
-from .utils import rect_dist
+from .utils import rect_dist, get_nearest_point_on_rect
 
 
 class Action(ABC):
@@ -19,7 +19,7 @@ class Action(ABC):
         pass
     
     @abstractmethod
-    def get_status(self):
+    def get_status(self, entity=None, game_state=None):
         """Return the status string for visualization"""
         pass
 
@@ -85,24 +85,33 @@ class GatherAction(Action):
                     # Stay in 'moving_to_patch' phase so it shows as 'harvest' status
                     # but don't move - waiting for patch to free up
                     pass
-        # Keep moving
-        if actual_dist > 5.0 and not entity.waypoints:
-            # Long distance - get a path
+        # Check actual geometric distance to perimeter
+        dist = rect_dist(entity.pos, entity.width, entity.height, patch.pos, patch.width, patch.height)
+        
+        if dist <= 0.1:
+            # We are touching! Start mining
+            self.phase = 'mining'
+            entity.waypoints = []
+            return
+
+        # Pathfinding for long distances
+        if not entity.waypoints and entity.pos.dist_to(patch.pos) > 5.0:
             raw_path = game_state.pathfinder.find_path(entity.pos, patch.pos, entity=entity)
             if raw_path:
                 entity.waypoints = game_state.pathfinder.smooth_path(raw_path, entity, game_state)
         
-        # Follow path if we have one
+        # Follow path or move towards nearest point
         if entity.waypoints:
             target = entity.waypoints[0]
             if entity.pos.dist_to(target) < 0.5:
                 entity.waypoints.pop(0)
                 if entity.waypoints:
                     target = entity.waypoints[0]
-            entity.move_towards(target, game_state)
+            entity.move_towards(target, game_state, ignore_static_id=patch.id)
         else:
-            # Direct move if close or no path found
-            entity.move_towards(patch.pos, game_state)
+            # Move towards the NEAREST POINT on the patch perimeter
+            target_pos = get_nearest_point_on_rect(entity.pos, patch.pos, patch.width, patch.height)
+            entity.move_towards(target_pos, game_state, ignore_static_id=patch.id)
     
     def _mine(self, entity, game_state):
         patch = game_state.entities.get(self.target_patch_id)
@@ -147,16 +156,26 @@ class GatherAction(Action):
         # Move towards base
         actual_dist = rect_dist(entity.pos, entity.width, entity.height, closest_base.pos, closest_base.width, closest_base.height)
         
-        if actual_dist <= entity.range:
+        if actual_dist <= 0.1:
             # Arrived - deposit minerals
             game_state.add_minerals(entity.owner_id, entity.carrying)
             entity.carrying = 0
             self.phase = 'moving_to_patch'
-            # Persistence: We no longer re-assign here. 
-            # We stick to our target_patch_id until we arrive and see it's blocked.
+            entity.waypoints = []
+            return
+
+        # Follow path if we have one
+        if entity.waypoints:
+            target = entity.waypoints[0]
+            if entity.pos.dist_to(target) < 0.5:
+                entity.waypoints.pop(0)
+                if entity.waypoints:
+                    target = entity.waypoints[0]
+            entity.move_towards(target, game_state, ignore_static_id=closest_base.id)
         else:
-            # Keep moving
-            entity.move_towards(closest_base.pos, game_state)
+            # Keep moving - target the nearest edge of the base
+            target_pos = get_nearest_point_on_rect(entity.pos, closest_base.pos, closest_base.width, closest_base.height)
+            entity.move_towards(target_pos, game_state, ignore_static_id=closest_base.id)
     def _find_best_patch(self, entity, game_state, max_dist=30.0, only_unoccupied=False):
         """Find the best mineral patch considering distance and current scv assignments"""
         patches = [e for e in game_state.entities.values()
@@ -240,9 +259,10 @@ class AttackAction(Action):
                         wp = entity.waypoints[0]
                 entity.move_towards(wp, game_state)
             else:
-                entity.move_towards(target.pos, game_state)
+                target_pos = get_nearest_point_on_rect(entity.pos, target.pos, target.width, target.height)
+                entity.move_towards(target_pos, game_state)
     
-    def get_status(self):
+    def get_status(self, entity=None, game_state=None):
         return 'attack'
 
     def to_dict(self):
@@ -290,7 +310,7 @@ class MoveAction(Action):
         # 3. Move towards the current target (waypoint or final destination)
         entity.move_towards(target, game_state)
     
-    def get_status(self):
+    def get_status(self, entity=None, game_state=None):
         return 'move'
 
     def to_dict(self):
@@ -322,5 +342,5 @@ class HoldAction(Action):
                 target.take_damage(entity.damage)
                 entity.current_cooldown = entity.cooldown
     
-    def get_status(self):
-        return 'idle'  # Hold position shows as idle
+    def get_status(self, entity=None, game_state=None):
+        return 'hold'

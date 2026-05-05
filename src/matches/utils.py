@@ -53,3 +53,17 @@ def rect_dist(pos1, w1, h1, pos2, w2, h2):
     if dx == 0: return dy
     if dy == 0: return dx
     return math.sqrt(dx**2 + dy**2)
+
+def get_nearest_point_on_rect(source_pos, rect_pos, rect_w, rect_h):
+    """Returns the point on the perimeter of the rectangle closest to source_pos."""
+    # Rectangle bounds
+    x_min = rect_pos.x - rect_w / 2
+    x_max = rect_pos.x + rect_w / 2
+    y_min = rect_pos.y - rect_h / 2
+    y_max = rect_pos.y + rect_h / 2
+    
+    # Clamp source point to rectangle bounds to find the closest point
+    res_x = max(x_min, min(source_pos.x, x_max))
+    res_y = max(y_min, min(source_pos.y, y_max))
+    
+    return Vector2D(res_x, res_y)

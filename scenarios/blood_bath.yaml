@@ -1,0 +1,301 @@
+version: 1.1
+name: MiningTest
+width: 64
+height: 64
+reference_image: 400px-Blood_Bath.jpg
+spawn_points: {}
+entities:
+- id: mineral_patch_1777961895868
+  type: mineral_patch
+  owner: neutral
+  x: 1
+  y: 2.5
+- id: base_1777961898677
+  type: base
+  owner: p1
+  x: 4
+  y: 7.5
+- id: scv_1777961900832
+  type: scv
+  owner: p1
+  x: 2.35
+  y: 9.35
+- id: mineral_patch_1777961936586
+  type: mineral_patch
+  owner: neutral
+  x: 2
+  y: 1.5
+- id: mineral_patch_1777961937577
+  type: mineral_patch
+  owner: neutral
+  x: 5
+  y: 2.5
+- id: mineral_patch_1777961938420
+  type: mineral_patch
+  owner: neutral
+  x: 6
+  y: 1.5
+- id: mineral_patch_1777961939043
+  type: mineral_patch
+  owner: neutral
+  x: 8
+  y: 2.5
+- id: mineral_patch_1777961939633
+  type: mineral_patch
+  owner: neutral
+  x: 9
+  y: 1.5
+- id: mineral_patch_1777961940634
+  type: mineral_patch
+  owner: neutral
+  x: 10
+  y: 5.5
+- id: mineral_patch_1777961941368
+  type: mineral_patch
+  owner: neutral
+  x: 11
+  y: 4.5
+- id: scv_1777961947935
+  type: scv
+  owner: p1
+  x: 3.35
+  y: 9.35
+- id: scv_1777961948470
+  type: scv
+  owner: p1
+  x: 4.35
+  y: 9.35
+- id: scv_1777961949629
+  type: scv
+  owner: p1
+  x: 5.35
+  y: 9.35
+- id: base_1777961988325
+  type: base
+  owner: p2
+  x: 55
+  y: 56.5
+- id: scv_1777961991380
+  type: scv
+  owner: p2
+  x: 53.35
+  y: 58.35
+- id: scv_1777961992258
+  type: scv
+  owner: p2
+  x: 54.35
+  y: 58.35
+- id: scv_1777961992828
+  type: scv
+  owner: p2
+  x: 55.35
+  y: 58.35
+- id: scv_1777961993620
+  type: scv
+  owner: p2
+  x: 56.35
+  y: 58.35
+- id: mineral_patch_1777961996912
+  type: mineral_patch
+  owner: neutral
+  x: 54
+  y: 62.5
+- id: mineral_patch_1777961997396
+  type: mineral_patch
+  owner: neutral
+  x: 55
+  y: 61.5
+- id: mineral_patch_1777961998161
+  type: mineral_patch
+  owner: neutral
+  x: 58
+  y: 62.5
+- id: mineral_patch_1777961998637
+  type: mineral_patch
+  owner: neutral
+  x: 59
+  y: 61.5
+- id: mineral_patch_1777961999214
+  type: mineral_patch
+  owner: neutral
+  x: 62
+  y: 61.5
+- id: mineral_patch_1777962004643
+  type: mineral_patch
+  owner: neutral
+  x: 63
+  y: 60.5
+- id: mineral_patch_1777962005618
+  type: mineral_patch
+  owner: neutral
+  x: 62
+  y: 58.5
+- id: mineral_patch_1777962006225
+  type: mineral_patch
+  owner: neutral
+  x: 63
+  y: 57.5
+triggers:
+- tick: 0
+  entity: scv_1777957791965
+  action:
+    type: gather
+    target:
+      id: m1
+- tick: 0
+  entity: scv_1777957797326
+  action:
+    type: gather
+    target:
+      id: mineral_patch_1777873419689
+- tick: 0
+  entity: scv_1777957796743
+  action:
+    type: gather
+    target:
+      id: m5
+- tick: 0
+  entity: scv_1777957792576
+  action:
+    type: gather
+    target:
+      id: m3
+- tick: 0
+  entity: scv_1777957805182
+  action:
+    type: gather
+    target:
+      id: m9
+- tick: 0
+  entity: scv_1777957805666
+  action:
+    type: gather
+    target:
+      id: m12
+- tick: 0
+  entity: scv_1777957806141
+  action:
+    type: gather
+    target:
+      id: m13
+- tick: 0
+  entity: scv_1777957806739
+  action:
+    type: gather
+    target:
+      id: m15
+- tick: 0
+  entity: scv_1777960048730
+  action:
+    type: gather
+    target:
+      id: m3
+- tick: 0
+  entity: scv_1777961231776
+  action:
+    type: gather
+    target:
+      id: mineral_patch_1777961228441
+- tick: 0
+  entity: scv_1777961262985
+  action:
+    type: gather
+    target:
+      id: mineral_patch_1777961246690
+- tick: 0
+  entity: scv_1777961263992
+  action:
+    type: gather
+    target:
+      id: mineral_patch_1777961248182
+- tick: 0
+  entity: scv_1777961264631
+  action:
+    type: gather
+    target:
+      id: mineral_patch_1777961254865
+- tick: 0
+  entity: scv_1777961265251
+  action:
+    type: gather
+    target:
+      id: mineral_patch_1777961255674
+- tick: 0
+  entity: scv_1777961291300
+  action:
+    type: gather
+    target:
+      id: mineral_patch_1777961298322
+- tick: 0
+  entity: scv_1777961291962
+  action:
+    type: gather
+    target:
+      id: mineral_patch_1777961299735
+- tick: 0
+  entity: scv_1777961293192
+  action:
+    type: gather
+    target:
+      id: mineral_patch_1777961302287
+- tick: 0
+  entity: scv_1777961292506
+  action:
+    type: gather
+    target:
+      id: mineral_patch_1777961301003
+- tick: 0
+  entity: base_1777961732322
+  action:
+    type: move
+    target:
+      x: -1.3189640831113554
+      y: 1.6011559040024042
+- tick: 0
+  entity: scv_1777961900832
+  action:
+    type: gather
+    target:
+      id: mineral_patch_1777961895868
+- tick: 0
+  entity: scv_1777961947935
+  action:
+    type: gather
+    target:
+      id: mineral_patch_1777961937577
+- tick: 0
+  entity: scv_1777961948470
+  action:
+    type: gather
+    target:
+      id: mineral_patch_1777961939043
+- tick: 0
+  entity: scv_1777961949629
+  action:
+    type: gather
+    target:
+      id: mineral_patch_1777961940634
+- tick: 0
+  entity: scv_1777961992828
+  action:
+    type: gather
+    target:
+      id: mineral_patch_1777962004643
+- tick: 0
+  entity: scv_1777961992258
+  action:
+    type: gather
+    target:
+      id: mineral_patch_1777961998637
+- tick: 0
+  entity: scv_1777961991380
+  action:
+    type: gather
+    target:
+      id: mineral_patch_1777961997396
+- tick: 0
+  entity: scv_1777961993620
+  action:
+    type: gather
+    target:
+      id: mineral_patch_1777962005618

@@ -92,14 +92,8 @@ class NavigationGrid:
             return True
         return False
     
-    def is_area_blocked(self, x, y, width, height, check_dynamic=True, entity=None):
+    def is_area_blocked(self, x, y, width, height, check_dynamic=True, entity=None, eps=0.2, ignore_static_id=None):
         """Checks if a rectangular area is partially or fully blocked."""
-        # Use larger epsilon (0.2) to allow squeezing through 1-tile gaps
-        # SCV is 0.7, Gap is 1.0. With 0.2 epsilon, we check an area of 0.3 centered at x.
-        # floor(center - 0.35 + 0.2) = floor(center - 0.15)
-        # floor(center + 0.35 - 0.2) = floor(center + 0.15)
-        # For center=30.5, both are 30. Correct.
-        eps = 0.2
         x1, y1 = math.floor(x - width/2 + eps), math.floor(y - height/2 + eps)
         x2, y2 = math.floor(x + width/2 - eps), math.floor(y + height/2 - eps)
         for ox in range(x1, x2 + 1):
@@ -107,6 +101,9 @@ class NavigationGrid:
                 if ox < 0 or ox >= self.width or oy < 0 or oy >= self.height:
                     return True
                 if self.static_grid[ox][oy] and (not entity or self.static_grid[ox][oy] != entity.id):
+                    # Check if we should ignore this specific static obstacle
+                    if ignore_static_id and self.static_grid[ox][oy] == ignore_static_id:
+                        continue
                     return True
                 if check_dynamic and self.dynamic_grid[ox][oy] and (not entity or self.dynamic_grid[ox][oy] != entity.id):
                     return True
@@ -218,6 +215,7 @@ class Entity:
             'x': round(self.pos.x, 2),
             'y': round(self.pos.y, 2),
             'hp': round(self.hp, 2),
+            'max_hp': self.max_hp,
             'status': self.get_current_status(game_state),
             'carrying': self.carrying,
             'prod_queue': self.production_queue,
@@ -246,21 +244,20 @@ class Entity:
     def is_stuck_check(self):
         """Monitors progress and activates ghosting if trapped."""
         self.pos_memory.append(self.pos.copy())
-        if len(self.pos_memory) > 100:
+        if len(self.pos_memory) > 30:
             self.pos_memory.pop(0)
 
-        if len(self.pos_memory) == 100:
+        if len(self.pos_memory) == 30:
             from .actions import GatherAction
             is_mining = isinstance(self.action, GatherAction) and self.action.phase == 'mining'
             
             dist_moved = self.pos.dist_to(self.pos_memory[0])
-            # High threshold (10.0) to ensure units trapped in small enclosures (like minerals) trigger it
-            if dist_moved < 10.0 and not is_mining:
-                # STUCK! Activate ghosting
-                self.ghost_mode_ticks = 20
-                self.pos_memory = [] # Reset memory
+            # If we haven't moved at least 0.5 tiles in 30 ticks, we are likely stuck
+            if dist_moved < 0.5 and not is_mining:
+                self.ghost_mode_ticks = 30
+                self.pos_memory = []
 
-    def move_towards(self, target_pos, game_state):
+    def move_towards(self, target_pos, game_state, ignore_static_id=None):
         """Moves the entity towards a target position with grid-aware collision and sliding."""
         # Backward compatibility: if no nav_grid, just move directly
         if not hasattr(game_state, 'nav_grid') or game_state.nav_grid is None:
@@ -293,20 +290,32 @@ class Entity:
         probe_dist = max(1.0, self.speed)
         from .actions import GatherAction
         am_gathering = isinstance(self.action, GatherAction)
+        # Gathering SCVs get a tiny bit of leniency to touch the edge properly
+        eps = 0.05 if am_gathering else 0.2
+
+        # If we are ALREADY blocked at current position, something is wrong (e.g. spawned inside building)
+        # Trigger ghost mode to let the unit "get out"
+        if game_state.nav_grid.is_area_blocked(self.pos.x, self.pos.y, self.width, self.height, check_dynamic=False, entity=self, eps=eps):
+            self.ghost_mode_ticks = 30
+
+        # Don't check dynamic collisions if in ghost mode
+        check_dynamic = (not am_gathering) and (self.ghost_mode_ticks <= 0)
+        # If in ghost mode, also be more lenient with static collisions to allow getting out
+        current_eps = 0.4 if self.ghost_mode_ticks > 0 else eps
         
         is_blocked = False
         step = 0.5
         d = step
         while d <= probe_dist:
             check_pos = self.pos + direction * d
-            if game_state.nav_grid.is_area_blocked(check_pos.x, check_pos.y, self.width, self.height, check_dynamic=not am_gathering, entity=self):
+            if game_state.nav_grid.is_area_blocked(check_pos.x, check_pos.y, self.width, self.height, check_dynamic=check_dynamic, entity=self, eps=current_eps, ignore_static_id=ignore_static_id):
                 is_blocked = True
                 break
             d += step
             
         if not is_blocked:
             probe_pos = self.pos + direction * probe_dist
-            if game_state.nav_grid.is_area_blocked(probe_pos.x, probe_pos.y, self.width, self.height, check_dynamic=not am_gathering, entity=self):
+            if game_state.nav_grid.is_area_blocked(probe_pos.x, probe_pos.y, self.width, self.height, check_dynamic=check_dynamic, entity=self, eps=current_eps, ignore_static_id=ignore_static_id):
                 is_blocked = True
         
         # If we're currently sliding, check if we've cleared the obstacle
@@ -317,10 +326,10 @@ class Entity:
                 move_dist = min(self.speed, dist)
                 self.pos += direction * move_dist
             else:
-                self.slide_logic(target_pos, game_state)
+                self.slide_logic(target_pos, game_state, ignore_static_id=ignore_static_id)
         elif is_blocked:
             # First time hitting obstacle, enter slide mode
-            self.slide_logic(target_pos, game_state)
+            self.slide_logic(target_pos, game_state, ignore_static_id=ignore_static_id)
         else:
             # No obstacle, move directly
             self.slide_direction = None
@@ -329,7 +338,7 @@ class Entity:
 
 
 
-    def slide_logic(self, target_pos, game_state):
+    def slide_logic(self, target_pos, game_state, ignore_static_id=None):
         """Finds a tangent path around an obstacle and sticks to it.
         Uses a fan-sweep algorithm to smoothly follow walls and dive into gaps."""
         import math
@@ -344,9 +353,11 @@ class Entity:
             step = 0.25
             d = step
             last_safe = 0
+            # Gathering SCVs get a tiny bit of leniency to touch the edge properly
+            eps = 0.05 if am_gathering else 0.2
             while d <= max_d:
                 p = self.pos + test_dir * d
-                if game_state.nav_grid.is_area_blocked(p.x, p.y, self.width, self.height, check_dynamic=not am_gathering, entity=self):
+                if game_state.nav_grid.is_area_blocked(p.x, p.y, self.width, self.height, check_dynamic=not am_gathering, entity=self, eps=eps, ignore_static_id=ignore_static_id):
                     break
                 last_safe = d
                 d += step
@@ -453,12 +464,14 @@ class Entity:
         if not hasattr(game_state, 'grid'):
             return
             
-        nearby_ids = game_state.grid.get_nearby_ids(self.pos)
-        
         from .actions import GatherAction
+        # SCV GHOSTING: Gathering units ignore repulsion to prevent gridlocks at minerals/bases
+        if isinstance(self.action, GatherAction):
+            return
+
+        nearby_ids = game_state.grid.get_nearby_ids(self.pos)
         from .utils import rect_dist, Vector2D
         import random
-        am_gathering = isinstance(self.action, GatherAction)
         
         for eid in nearby_ids:
             if eid == self.id: continue
@@ -466,15 +479,14 @@ class Entity:
             if not other or other.status == 'dead' or other.definition.get('category') in ['building', 'resource']:
                 continue
             
-            # scv GHOSTING: 
-            # SCVs assigned to minerals ignore collision with other gathering scvs to prevent gridlocks.
-            if am_gathering and other.type == 'scv' and isinstance(other.action, GatherAction):
+            # If the OTHER unit is gathering, we also ignore it to let it pass
+            if isinstance(other.action, GatherAction):
                 continue
 
             dist = rect_dist(self.pos, self.width, self.height, other.pos, other.width, other.height)
             if dist <= 0: # Overlapping
                 # Repel
-                overlap_depth = 0.2 # Small constant push if overlapping
+                overlap_depth = 0.15 # Slightly smaller push
                 push_dir = (self.pos - other.pos).normalize()
                 if push_dir.length_sq() < 0.01:
                     push_dir = Vector2D(random.uniform(-1,1), random.uniform(-1,1)).normalize()
@@ -667,7 +679,21 @@ class MatchSimulator:
         For a normal match, call setup_match() first.
         For scenarios, add entities manually and configure triggers.
         """
-        # Initial State (Tick 0)
+        # Ensure all entities have correct HP before first snapshot
+        for e in self.entities.values():
+            if e.hp <= 0 and e.status != 'dead':
+                e.hp = e.definition.get('hp', 100)
+                e.max_hp = e.definition.get('max_hp', e.hp)
+
+        # 1. Execute initial triggers (Tick 0) BEFORE capturing state
+        # This ensures Tick 0 status reflects the starting orders
+        for trigger in self.triggers.get(0, []):
+            entity = self.entities.get(trigger['entity_id'])
+            if entity:
+                entity.set_action(trigger['action'])
+                entity.action.prepare(entity, self)
+
+        # 2. Initial State (Tick 0 Snapshot)
         initial_state = [e.to_dict(self) for e in self.entities.values()]
         self.history.append({
             'tick': 0, 
@@ -676,26 +702,25 @@ class MatchSimulator:
             'resources': self.resources.copy()
         })
 
-        # Execute initial triggers (Tick 0)
-        for trigger in self.triggers.get(0, []):
-            entity = self.entities.get(trigger['entity_id'])
-            if entity:
-                entity.set_action(trigger['action'])
-                entity.action.prepare(entity, self)
-
         # 1. Main Simulation Loop
         for tick in range(1, self.max_ticks + 1):
-            # Execute triggers for this tick
+            # 1. Capture Snapshots BEFORE triggers and updates
+            pre_update_snapshots = {eid: ent.to_dict(self) for eid, ent in self.entities.items()}
+            old_resources = self.resources.copy()
+            old_entity_ids = set(self.entities.keys())
+
+            # 2. Execute triggers for this tick
             for trigger in self.triggers.get(tick, []):
                 entity = self.entities.get(trigger['entity_id'])
                 if entity:
                     entity.set_action(trigger['action'])
                     entity.action.prepare(entity, self)
 
-            # 2. Update Controllers
+            # 3. Update Controllers
             for ai in self.ai_controllers:
                 ai.update(self)
-            # 3. Prepare Spatial Search & Nav Grid
+            
+            # 4. Prepare Spatial Search & Nav Grid
             self.grid.clear()
             self.nav_grid.clear_dynamic()
             for ent in self.entities.values():
@@ -704,15 +729,6 @@ class MatchSimulator:
                     if ent.definition.get('category') == 'unit':
                         self.nav_grid.set_dynamic_rect(ent.pos.x, ent.pos.y, ent.width, ent.height, ent.id)
             
-            # Clean up static grid for depleted minerals
-            # (In a real engine we'd do this on death, but here we can refresh if needed)
-            # Actually minerals don't move, so we only need to clear if they die.
-            
-            # 4. Capture Snapshots for delta calculation
-            pre_update_snapshots = {eid: ent.to_dict(self) for eid, ent in self.entities.items()}
-            old_resources = self.resources.copy()
-            old_entity_ids = set(self.entities.keys())
-
             # 5. Physics/Behavior Update
             for ent in list(self.entities.values()):
                 ent.update(self)

@@ -255,10 +255,12 @@ def save_scenario_api(request):
             full_path = base_dir / filename
             
             yaml_content = {
+                'version': data.get('version', 1.0),
                 'name': data.get('name', 'New Scenario'),
                 'width': data.get('width', 128),
                 'height': data.get('height', 128),
                 'reference_image': data.get('reference_image'),
+                'spawn_points': data.get('spawn_points', {}),
                 'entities': data.get('entities', []),
                 'triggers': data.get('triggers', []),
             }

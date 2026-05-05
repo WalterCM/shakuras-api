@@ -111,7 +111,7 @@
         }
         .cat-tab.active { background: var(--bg-card); color: white; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
 
-        .palette-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+        .cat-tab.subtab { font-size: 9px; padding: 6px; }
         .palette-item {
             background: rgba(15,23,42,0.3); border: 1px solid rgba(255,255,255,0.08);
             padding: 12px 4px; border-radius: 12px; color: var(--text-main); cursor: pointer;
@@ -220,32 +220,31 @@
 <!-- ===== EDITOR SCREEN ===== -->
 <div id="screen-editor" class="editor-layout">
     <div class="sidebar">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h1>Project</h1>
-            <div style="font-size: 11px; color: var(--danger); cursor: pointer; font-weight: 600;" onclick="location.reload()">EXIT</div>
+        <button class="sys-btn" style="margin-bottom: 16px; width: 100%; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); flex: none;" onclick="goHome()"><span>⌂</span> HOME / LIST</button>
+
+        <div class="category-tabs" style="margin-bottom: 10px;">
+            <button id="tab-entities" class="cat-tab active" onclick="setEditorMode('entities')">MODO ENTIDAD</button>
+            <button id="tab-triggers" class="cat-tab" onclick="setEditorMode('triggers')">MODO TRIGGER</button>
         </div>
 
-        <div class="control-group">
-            <label>Filename</label>
-            <input type="text" id="file-name" value="New_Asset">
-        </div>
-
-        <div class="control-group">
-            <label>Map Size</label>
-            <div style="display: flex; gap: 8px;">
-                <input type="number" id="map-w" value="128" style="width: 50%;" title="Width">
-                <input type="number" id="map-h" value="128" style="width: 50%;" title="Height">
+        <div id="panel-entities">
+            <div class="control-group">
+                <label>Project</label>
+                <input type="text" id="file-name" value="New_Asset">
+                <div style="display: flex; gap: 8px;">
+                    <input type="number" id="map-w" value="128" style="width: 50%;" title="Width">
+                    <input type="number" id="map-h" value="128" style="width: 50%;" title="Height">
+                </div>
             </div>
-        </div>
 
-        <div class="control-group">
-            <label>Tools</label>
-            <div class="system-tools">
-                <button id="btn-cursor" class="sys-btn active" onclick="setTool('cursor')"><span>⇖</span> Select</button>
-                <button id="btn-delete" class="sys-btn delete" onclick="setTool('delete')"><span>×</span> Delete</button>
+            <div class="control-group">
+                <label>Design Tools</label>
+                <div class="system-tools">
+                    <button id="btn-cursor" class="sys-btn active" onclick="setTool('cursor')"><span>⇖</span> Select</button>
+                    <button id="btn-delete" class="sys-btn delete" onclick="setTool('delete')"><span>×</span> Delete</button>
+                </div>
             </div>
-        </div>
-        <div id="sidebar-design">
+
             <div class="control-group">
                 <label>Palette</label>
                 <div class="owner-selector">
@@ -254,11 +253,11 @@
                     <button id="owner-neutral" class="owner-btn neutral" onclick="setOwner('neutral')">NEUTRAL</button>
                 </div>
                 
-                <div class="category-tabs">
-                    <button class="cat-tab active" onclick="setCategory('neutral')">NEUTRAL</button>
-                    <button class="cat-tab" onclick="setCategory('terran')">TERRAN</button>
-                    <button class="cat-tab" onclick="setCategory('protoss')">PROTOSS</button>
-                    <button class="cat-tab" onclick="setCategory('zerg')">ZERG</button>
+                <div class="category-tabs" style="margin-top: 8px;">
+                    <button class="cat-tab active subtab" onclick="setCategory('neutral')">NEUTRAL</button>
+                    <button class="cat-tab subtab" onclick="setCategory('terran')">TERRAN</button>
+                    <button class="cat-tab subtab" onclick="setCategory('protoss')">PROTOSS</button>
+                    <button class="cat-tab subtab" onclick="setCategory('zerg')">ZERG</button>
                 </div>
 
                 <div id="unit-palette" class="palette-grid"></div>
@@ -277,14 +276,6 @@
             </div>
 
             <div class="control-group">
-                <label>Entity Inspector</label>
-                <div id="inspector" class="inspector">
-                    <div id="ins-name" style="font-weight: 600; color: var(--accent); margin-bottom: 8px;">No Selection</div>
-                    <div id="ins-orders" style="display: flex; flex-direction: column; gap: 4px;"></div>
-                </div>
-            </div>
-
-            <div class="control-group">
                 <label>Reference Image</label>
                 <div id="ref-status" style="font-size: 10px; color: var(--accent); margin-bottom: 4px; font-weight: 600;">No image loaded</div>
                 <input type="file" id="ref-input" accept="image/*" style="font-size: 10px;">
@@ -295,25 +286,30 @@
             </div>
         </div>
 
-        <div id="sidebar-simulate" style="display: none;">
+        <div id="panel-triggers" style="display: none;">
             <div class="control-group">
-                <label>Resources</label>
-                <div id="resource-panel" style="display: flex; flex-direction: column; gap: 8px;">
-                    <!-- Will be populated by JS -->
+                <label>Inspector</label>
+                <div id="inspector" class="inspector">
+                    <div id="ins-name" style="font-weight: 600; color: var(--accent); margin-bottom: 8px;">No Selection</div>
+                    <div id="ins-orders" style="display: flex; flex-direction: column; gap: 4px;"></div>
                 </div>
             </div>
-            <div class="control-group" style="flex: 1; display: flex; flex-direction: column;">
+
+            <div class="control-group">
+                <label>Resources</label>
+                <div id="resource-panel" style="display: flex; flex-direction: column; gap: 8px;"></div>
+            </div>
+
+            <div class="control-group" style="flex: 1; min-height: 200px; display: flex; flex-direction: column;">
                 <label>Action Log</label>
-                <div id="delta-log" style="flex: 1; background: rgba(15,23,42,0.4); border-radius: 12px; padding: 12px; font-size: 11px; overflow-y: auto; font-family: 'JetBrains Mono', monospace;">
-                    <!-- Will be populated by JS -->
-                </div>
+                <div id="delta-log" style="flex: 1; background: rgba(15,23,42,0.4); border-radius: 12px; padding: 10px; font-size: 10px; overflow-y: auto; font-family: 'JetBrains Mono', monospace; border: 1px solid rgba(255,255,255,0.05);"></div>
             </div>
         </div>
 
-        <div class="btn-group">
-            <button id="run-btn" class="run-btn" onclick="runSimulation()">▶ Run Simulation</button>
-            <button id="stop-btn" class="primary-btn" onclick="stopSimulation()" style="display: none; background: var(--danger);">■ Stop Simulation</button>
-            <button id="save-btn" class="primary-btn" onclick="save(false)">Save Changes</button>
+
+        <div class="btn-group" style="margin-top: auto; display: flex; flex-direction: column; gap: 8px;">
+            <button id="save-btn" class="primary-btn" onclick="save(false)">Save Scenario</button>
+            <button id="save-as-btn" class="primary-btn" style="background: rgba(255,255,255,0.05); color: var(--text-main); border: 1px solid rgba(255,255,255,0.1);" onclick="saveAs()">Save As New...</button>
         </div>
     </div>
 
@@ -325,7 +321,7 @@
             <span>MODE: <b id="ui-mode" style="color: var(--accent);">SELECT</b></span>
         </div>
         
-        <div id="playback-bar" class="playback-bar" style="display: none;">
+        <div id="playback-bar" class="playback-bar">
             <button onclick="togglePlay()" id="play-pause-btn">▶</button>
             <input type="range" id="timeline" min="0" max="0" value="0" oninput="seek(parseInt(this.value))">
             <span id="timer">0/0</span>
@@ -372,23 +368,63 @@
         undoStack.push(JSON.stringify({ entities, triggers }));
         if (undoStack.length > 50) undoStack.shift();
         redoStack = [];
+        autoSimulate();
     }
-    function undo() { if (undoStack.length <= 1) return; redoStack.push(undoStack.pop()); const state = JSON.parse(undoStack[undoStack.length - 1]); entities = state.entities; triggers = state.triggers; updateInspector(); updateUI(); }
-    function redo() { if (redoStack.length === 0) return; const stateStr = redoStack.pop(); undoStack.push(stateStr); const state = JSON.parse(stateStr); entities = state.entities; triggers = state.triggers; updateInspector(); updateUI(); }
+    
+    let simTimeout = null;
+    function autoSimulate() {
+        if (simTimeout) clearTimeout(simTimeout);
+        simTimeout = setTimeout(() => {
+            if (replayData) requestSimulation(false);
+        }, 500); // 500ms debounce
+    }
+    function undo() { 
+        if (undoStack.length <= 1) return; 
+        redoStack.push(undoStack.pop()); 
+        const state = JSON.parse(undoStack[undoStack.length - 1]); 
+        entities = state.entities; 
+        triggers = state.triggers; 
+        if (currentTick > 0) { currentTick = 0; isPlaying = false; }
+        updateInspector(); updateUI(); autoSimulate();
+    }
+    function redo() { 
+        if (redoStack.length === 0) return; 
+        const stateStr = redoStack.pop(); 
+        undoStack.push(stateStr); 
+        const state = JSON.parse(stateStr); 
+        entities = state.entities; 
+        triggers = state.triggers; 
+        if (currentTick > 0) { currentTick = 0; isPlaying = false; }
+        updateInspector(); updateUI(); autoSimulate();
+    }
 
     // Reference Image
     let refImage = null, refImageFilename = null, refOpacity = 0.3;
 
+    let editorMode = 'entities';
+    function setEditorMode(mode) {
+        editorMode = mode;
+        document.getElementById('panel-entities').style.display = mode === 'entities' ? 'block' : 'none';
+        document.getElementById('panel-triggers').style.display = mode === 'triggers' ? 'block' : 'none';
+        
+        document.getElementById('tab-entities').classList.toggle('active', mode === 'entities');
+        document.getElementById('tab-triggers').classList.toggle('active', mode === 'triggers');
+
+        if (mode === 'entities') {
+            seek(0); // Standard: place units at T0
+        }
+    }
     const ENTITY_CATEGORIES = {
-        neutral: ['mineral_patch', 'base'],
-        terran: ['scv', 'marine', 'tank'],
+        neutral: ['mineral_patch', 'start_location'],
+        terran: ['base', 'scv', 'marine', 'tank'],
         protoss: ['zealot'],
         zerg: ['zergling']
     };
 
     const FRIENDLY_NAMES = {
         'mineral_patch': 'Mineral Patch',
-        'base': 'Start Location',
+        'start_location': 'Starting Point',
+        'base': 'Command Center',
         'scv': 'SCV',
         'marine': 'Marine',
         'zealot': 'Zealot',
@@ -402,7 +438,9 @@
         const types = ENTITY_CATEGORIES[currentCategory];
         document.getElementById('unit-palette').innerHTML = types.map(t => {
             const name = FRIENDLY_NAMES[t] || t;
-            const icon = t === 'base' ? 'S' : t[0].toUpperCase();
+            let icon = t[0].toUpperCase();
+            if (t === 'base') icon = 'CC';
+            if (t === 'start_location') icon = 'S';
             return `
                 <div class="palette-item ${t === currentTool ? 'active' : ''}" onclick="setTool('${t}')">
                     <div class="icon" style="background: #475569">${icon}</div>
@@ -444,14 +482,40 @@
         return { x: (sx - r.left - canvas.width/2 - offsetX) / scale, y: (sy - r.top - canvas.height/2 - offsetY) / scale };
     }
 
+    function getNearestPointOnRect(srcX, srcY, rectX, rectY, rectW, rectH) {
+        const xMin = rectX - rectW / 2;
+        const xMax = rectX + rectW / 2;
+        const yMin = rectY - rectH / 2;
+        const yMax = rectY + rectH / 2;
+        
+        // Clamp source point to find the point on or inside the rect
+        let resX = Math.max(xMin, Math.min(srcX, xMax));
+        let resY = Math.max(yMin, Math.min(srcY, yMax));
+        
+        // If the source is ALREADY inside, push it to the nearest edge to stay on perimeter
+        if (resX === srcX && resY === srcY) {
+            const dl = srcX - xMin;
+            const dr = xMax - srcX;
+            const dt = srcY - yMin;
+            const db = yMax - srcY;
+            const minDist = Math.min(dl, dr, dt, db);
+            if (minDist === dl) resX = xMin;
+            else if (minDist === dr) resX = xMax;
+            else if (minDist === dt) resY = yMin;
+            else resY = yMax;
+        }
+        
+        return { x: resX, y: resY };
+    }
+
     function renderEntity(type, owner, x, y, isSelected = false, isSimulation = false) {
         const d = UNIT_DEFS[type] || { width: 1, height: 1 };
         const w = d.width;
         const h = d.height;
         
-        // Convert simulation center coords to top-left if needed
-        const drawX = isSimulation ? x - w / 2 : x;
-        const drawY = isSimulation ? y - h / 2 : y;
+        // (x, y) is ALWAYS the center coordinate in the engine and editor logic now
+        const drawX = x - w / 2;
+        const drawY = y - h / 2;
         
         ctx.fillStyle = owner === 'p1' ? '#3b82f6' : (owner === 'p2' ? '#ef4444' : '#eab308');
         if (type === 'mineral_patch') ctx.fillStyle = '#00f2ff';
@@ -485,9 +549,8 @@
 
     function getEntityRect(ent) {
         const d = UNIT_DEFS[ent.type] || { width: 1, height: 1 };
-        const isSimulation = ent.owner_id !== undefined;
-        const x = isSimulation ? ent.x - d.width/2 : ent.x;
-        const y = isSimulation ? ent.y - d.height/2 : ent.y;
+        const x = ent.x - d.width/2;
+        const y = ent.y - d.height/2;
         return { x, y, w: d.width, h: d.height };
     }
 
@@ -502,8 +565,10 @@
             if (elapsed >= nextFrameDelay) {
                 currentTick++;
                 if (currentTick >= replayData.length) {
-                    currentTick = replayData.length - 1;
+                    currentTick = 0;
                     isPlaying = false;
+                    const b1 = document.getElementById('play-pause-btn');
+                    if (b1) b1.innerText = '▶';
                 }
                 lastFrameTime = timestamp;
                 updatePlaybackUI();
@@ -552,7 +617,9 @@
             }
         }
 
-        if (replayData && replayData[currentTick]) {
+        // Show replay data only if we are actually viewing a simulation result (> Tick 0 or playing)
+        // If we are at Tick 0, we should show the LIVE entities so we can edit/drag them.
+        if (replayData && (currentTick > 0 || isPlaying)) {
             const frame = replayData[currentTick];
             frame.entities.forEach(e => {
                 renderEntity(e.type, e.owner_id, e.x, e.y, selectedIds.includes(e.id), true);
@@ -567,11 +634,13 @@
         if (currentTool !== 'cursor' && currentTool !== 'delete' && !isPanning) {
             const d = UNIT_DEFS[currentTool];
             const snap = document.getElementById('snap-grid').checked;
-            const gx = snap ? Math.floor(mouseWorldPos.x) : mouseWorldPos.x - d.width/2;
-            const gy = snap ? Math.floor(mouseWorldPos.y) : mouseWorldPos.y - d.height/2;
+            const center_x = snap ? Math.floor(mouseWorldPos.x) + d.width/2 : mouseWorldPos.x;
+            const center_y = snap ? Math.floor(mouseWorldPos.y) + d.height/2 : mouseWorldPos.y;
+            
             ctx.fillStyle = currentOwner === 'p1' ? '#3b82f6' : (currentOwner === 'p2' ? '#ef4444' : '#eab308');
             if (currentTool === 'mineral_patch') ctx.fillStyle = '#00f2ff';
-            ctx.globalAlpha = 0.4; ctx.fillRect(gx, gy, d.width, d.height);
+            ctx.globalAlpha = 0.4; 
+            ctx.fillRect(center_x - d.width/2, center_y - d.height/2, d.width, d.height);
             ctx.globalAlpha = 1.0;
         }
 
@@ -588,26 +657,65 @@
             ctx.strokeRect(x, y, w, h);
         }
 
-        triggers.forEach(t => {
+        // Filter and draw only ACTIVE triggers for the current tick
+        const activeTriggers = [];
+        const entityIdsWithTriggers = [...new Set(triggers.map(t => t.entity))];
+        
+        entityIdsWithTriggers.forEach(id => {
+            const entityTriggers = triggers.filter(t => t.entity === id && t.tick <= currentTick);
+            if (entityTriggers.length > 0) {
+                // Get the most recent one that has already started
+                const active = entityTriggers.sort((a,b) => b.tick - a.tick)[0];
+                activeTriggers.push(active);
+            }
+        });
+
+        activeTriggers.forEach(t => {
             const e = entities.find(ent => ent.id === t.entity);
             if (!e) return;
+            
+            // Get CURRENT position from replay if available, otherwise use base position
+            let curX = e.x, curY = e.y;
+            if (replayData && replayData[currentTick]) {
+                const re = replayData[currentTick].entities.find(ent => ent.id === t.entity);
+                if (re) { curX = re.x; curY = re.y; }
+            }
+
             const d = UNIT_DEFS[e.type];
-            ctx.beginPath(); ctx.setLineDash([1,1]); ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1/scale;
-            ctx.moveTo(e.x + d.width/2, e.y + d.height/2);
-            if (t.action.target) {
-                ctx.lineTo(t.action.target.x, t.action.target.y);
+            ctx.beginPath(); ctx.setLineDash([2,2]); ctx.strokeStyle = 'rgba(56,189,248,0.6)'; ctx.lineWidth = 1/scale;
+            ctx.moveTo(curX, curY);
+
+            let targetX = null, targetY = null;
+            let edgeX = null, edgeY = null;
+
+            if (t.action.target && t.action.target.x !== undefined) {
+                targetX = t.action.target.x;
+                targetY = t.action.target.y;
+            } else if (t.action.target && t.action.target.id) {
+                const tar = entities.find(ent => ent.id === t.action.target.id);
+                if (tar) {
+                    // Line points to center for visual stability
+                    targetX = tar.x;
+                    targetY = tar.y;
+                    
+                    // Waypoint circle snaps to edge based on STARTING position for stability
+                    const td = UNIT_DEFS[tar.type] || { width: 1, height: 1 };
+                    const nearest = getNearestPointOnRect(e.x, e.y, tar.x, tar.y, td.width, td.height);
+                    edgeX = nearest.x;
+                    edgeY = nearest.y;
+                }
+            }
+
+            if (targetX !== null) {
+                ctx.lineTo(targetX, targetY);
                 ctx.stroke();
                 ctx.setLineDash([]);
-                // Draw Waypoint Handle
-                ctx.fillStyle = selectedIds.includes(`wp_${t.entity}`) ? '#fff' : '#10b981';
-                ctx.beginPath(); ctx.arc(t.action.target.x, t.action.target.y, 0.3, 0, Math.PI*2); ctx.fill();
-            } else if (t.action.target && t.action.target.id) { 
-                const tar = entities.find(ent => ent.id === t.action.target.id); 
-                if (tar) {
-                    const td = UNIT_DEFS[tar.type];
-                    ctx.lineTo(tar.x + td.width/2, tar.y + td.height/2);
-                    ctx.stroke();
-                }
+                
+                // Draw Waypoint Handle at the EDGE (if available) or target point
+                const wx = edgeX !== null ? edgeX : targetX;
+                const wy = edgeY !== null ? edgeY : targetY;
+                ctx.fillStyle = selectedIds.includes(`wp_${t.entity}`) ? '#fff' : '#38bdf8';
+                ctx.beginPath(); ctx.arc(wx, wy, 0.4, 0, Math.PI*2); ctx.fill();
             }
             ctx.setLineDash([]);
         });
@@ -626,20 +734,45 @@
                 const firstId = selectedIds[0];
                 const currentVisible = getVisibleEntities();
                 const ent = currentVisible.find(ent => ent.id === firstId);
-                if (!ent || ent.owner === 'neutral') return;
+                if (!ent || (ent.owner || ent.owner_id) === 'neutral') return;
                 
                 let tar = currentVisible.find(ent => { 
                     const r = getEntityRect(ent);
-                    return w.x >= r.x && w.x <= r.x + r.w && w.y >= r.y && w.y <= r.y + r.h; 
+                    // Add 0.5 padding for easier clicking (magnetic effect)
+                    return w.x >= r.x - 0.5 && w.x <= r.x + r.w + 0.5 && w.y >= r.y - 0.5 && w.y <= r.y + r.h + 0.5; 
                 });
                 
+                // If still not found, try a simple distance check for tiny units
+                if (!tar) {
+                    tar = currentVisible.find(ent => Math.hypot(ent.x - w.x, ent.y - w.y) < 1.0);
+                }
+                
+                const targetTick = replayData ? currentTick : 0;
+
                 selectedIds.forEach(id => {
-                    const e = entities.find(e => e.id === id); // We still update the instructions (triggers)
-                    const owner = e ? e.owner : (entities.find(en => en.id === id)?.owner);
-                    if (!e || (e.owner || e.owner_id) === 'neutral') return;
-                    triggers = triggers.filter(t => !(t.entity === id && t.tick === 0));
-                    if (tar) triggers.push({ tick: 0, entity: id, action: { type: tar.type === 'mineral_patch' ? 'gather' : (tar.owner !== e.owner ? 'attack' : 'move'), target: { id: tar.id } } });
-                    else triggers.push({ tick: 0, entity: id, action: { type: 'move', target: { x: w.x, y: w.y } } });
+                    // Check if unit is neutral (cannot give orders)
+                    const e = entities.find(e => e.id === id); 
+                    if (!e || e.owner === 'neutral') return;
+
+                    // Remove existing triggers for THIS EXACT TICK to avoid duplicates
+                    triggers = triggers.filter(t => !(t.entity === id && t.tick === targetTick));
+                    
+                    if (tar) {
+                        triggers.push({ 
+                            tick: targetTick, 
+                            entity: id, 
+                            action: { 
+                                type: tar.type === 'mineral_patch' ? 'gather' : (tar.owner !== e.owner ? 'attack' : 'move'), 
+                                target: { id: tar.id } 
+                            } 
+                        });
+                    } else {
+                        triggers.push({ 
+                            tick: targetTick, 
+                            entity: id, 
+                            action: { type: 'move', target: { x: w.x, y: w.y } } 
+                        });
+                    }
                 });
                 
                 saveState(); updateInspector();
@@ -648,6 +781,25 @@
         }
 
         if (e.button === 0) {
+            // Left-click logic
+            if (currentTick > 0) {
+                // In simulation playback, left-click only selects, no dragging/placing
+                let clicked = getVisibleEntities().find(ent => { 
+                    const r = getEntityRect(ent);
+                    return w.x >= r.x && w.x <= r.x + r.w && w.y >= r.y && w.y <= r.y + r.h; 
+                });
+                if (clicked) {
+                    if (!selectedIds.includes(clicked.id)) {
+                        if (!e.ctrlKey) selectedIds = [clicked.id];
+                        else selectedIds.push(clicked.id);
+                    }
+                } else if (!e.ctrlKey) {
+                    selectedIds = [];
+                }
+                updateInspector();
+                return;
+            }
+
             if (currentTool === 'cursor') {
                 // Common logic for dragging either a waypoint or an entity
                 const startDrag = () => {
@@ -697,13 +849,18 @@
                 updateInspector();
             } else if (currentTool === 'delete') {
                 const prevLen = entities.length;
-                entities = entities.filter(ent => { const d = UNIT_DEFS[ent.type]; return !(w.x >= ent.x && w.x <= ent.x + d.width && w.y >= ent.y && w.y <= ent.y + d.height); });
+                entities = entities.filter(ent => { 
+                    const d = UNIT_DEFS[ent.type]; 
+                    const x1 = ent.x - d.width/2;
+                    const y1 = ent.y - d.height/2;
+                    return !(w.x >= x1 && w.x <= x1 + d.width && w.y >= y1 && w.y <= y1 + d.height); 
+                });
                 if (entities.length !== prevLen) saveState();
             } else {
                 const snap = document.getElementById('snap-grid').checked;
                 const d = UNIT_DEFS[currentTool];
-                const px = snap ? Math.floor(w.x) : w.x - d.width/2;
-                const py = snap ? Math.floor(w.y) : w.y - d.height/2;
+                const px = snap ? Math.floor(w.x) + d.width/2 : w.x;
+                const py = snap ? Math.floor(w.y) + d.height/2 : w.y;
                 entities.push({ id: `${currentTool}_${Date.now()}`, type: currentTool, owner: currentOwner, x: px, y: py });
                 selectedIds = [entities[entities.length-1].id]; saveState(); updateInspector();
             }
@@ -785,6 +942,8 @@
     });
 
     window.addEventListener('keydown', (e) => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        
         if (e.ctrlKey && e.code === 'KeyZ') { e.preventDefault(); undo(); }
         if (e.ctrlKey && e.code === 'KeyY') { e.preventDefault(); redo(); }
         if (e.code === 'KeyC') { const cb = document.getElementById('show-collisions'); cb.checked = !cb.checked; }
@@ -816,14 +975,62 @@
             document.getElementById('ins-orders').innerHTML = '';
             return;
         }
-        const e = entities.find(ent => ent.id === selectedIds[0]);
-        document.getElementById('ins-name').textContent = e ? `${(FRIENDLY_NAMES[e.type] || e.type).toUpperCase()} (${e.owner})` : 'No Selection';
-        const t = triggers.filter(tr => tr.entity === selectedIds[0]);
-        document.getElementById('ins-orders').innerHTML = t.map(tr => `<div style="font-size:11px; margin-bottom:4px; border-left:2px solid var(--accent); padding-left:8px;">T${tr.tick}: ${tr.action.type.toUpperCase()}</div>`).join('');
+        
+        const id = selectedIds[0];
+        const e = entities.find(ent => ent.id === id);
+        if (!e) return;
+        
+        document.getElementById('ins-name').textContent = `${(FRIENDLY_NAMES[e.type] || e.type).toUpperCase()} (${e.owner})`;
+        
+        let html = '';
+        
+        // Simulation Stats - Reconstruct state from deltas
+        if (replayData && replayData[currentTick]) {
+            // Helper to find latest value for a property with unit definition fallback
+            const getLatest = (prop, fallback) => {
+                for (let t = currentTick; t >= 0; t--) {
+                    const frameEnt = replayData[t].entities?.find(ent => ent.id === id);
+                    if (frameEnt && frameEnt[prop] !== undefined) return frameEnt[prop];
+                }
+                // If not in replay, try unit definitions for stats
+                const def = UNIT_DEFS[e.type] || {};
+                if (prop === 'hp' || prop === 'max_hp') return def.hp || fallback;
+                return e[prop] !== undefined ? e[prop] : fallback;
+            };
+
+            const curHP = getLatest('hp', 0);
+            const curMax = getLatest('max_hp', 0);
+            const curStatus = getLatest('status', 'idle');
+            const curX = getLatest('x', e.x);
+            const curY = getLatest('y', e.y);
+
+            html += `<div style="font-size: 11px; margin-bottom: 12px; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 6px; border-left: 2px solid var(--accent);">
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span>HP:</span><span style="font-weight:bold;">${Math.floor(Number(curHP) || 0)}/${curMax || 0}</span></div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span>Pos:</span><span>${Number(curX).toFixed(1)}, ${Number(curY).toFixed(1)}</span></div>
+                <div style="display:flex; justify-content:space-between;"><span>Status:</span><span style="color:var(--accent);">${String(curStatus).toUpperCase()}</span></div>
+            </div>`;
+        }
+        
+        // Scenario Instructions (Triggers)
+        const t = triggers.filter(tr => tr.entity === id).sort((a, b) => a.tick - b.tick);
+        html += `<label style="font-size:9px; margin-bottom:4px; display:block;">Tactical Orders</label>`;
+        html += t.map(tr => `<div style="font-size:11px; margin-bottom:4px; border-left:2px solid rgba(255,255,255,0.2); padding-left:8px; display:flex; justify-content:space-between;">
+            <span>T${tr.tick}: ${tr.action.type.toUpperCase()}</span>
+            <button onclick="removeTrigger('${tr.entity}', ${tr.tick})" style="background:none; border:none; color:var(--danger); cursor:pointer; font-size:10px;">×</button>
+        </div>`).join('');
+        
+        document.getElementById('ins-orders').innerHTML = html;
+    }
+
+    function removeTrigger(entityId, tick) {
+        triggers = triggers.filter(t => !(t.entity === entityId && t.tick === tick));
+        saveState();
+        updateInspector();
     }
 
     function updateUI() {
-        document.getElementById('run-btn').style.display = triggers.length > 0 ? 'block' : 'none';
+        const runBtn = document.getElementById('sidebar-run-btn');
+        if (runBtn) runBtn.style.display = triggers.length > 0 ? 'block' : 'none';
         document.getElementById('ui-zoom').textContent = `${scale.toFixed(1)}x`;
     }
 
@@ -849,9 +1056,31 @@
         
         mapW = s.width || 128;
         mapH = s.height || 128;
-        entities = s.entities || [];
-        triggers = s.triggers || [];
         
+        // Migration: convert old top-left coordinates to new center coordinates
+        entities = (s.entities || []).map(e => {
+            if (!s.version || s.version < 1.1) {
+                const d = UNIT_DEFS[e.type] || { width: 1, height: 1 };
+                return { ...e, x: e.x + d.width/2, y: e.y + d.height/2 };
+            }
+            return e;
+        });
+
+        // Restore spawn points as editor entities
+        if (s.spawn_points) {
+            Object.entries(s.spawn_points).forEach(([owner, pos]) => {
+                let x = pos.x;
+                let y = pos.y;
+                if (!s.version || s.version < 1.1) {
+                    // Old maps used top-left for spawn points too (1x1 size)
+                    x += 0.5;
+                    y += 0.5;
+                }
+                entities.push({ id: `spawn_${owner}`, type: 'start_location', owner, x, y });
+            });
+        }
+        
+        triggers = s.triggers || [];
         if (s.reference_image) {
             loadRefImage(s.reference_image);
         } else {
@@ -874,6 +1103,9 @@
         
         resize();
         updateUI();
+
+        saveState();
+        requestSimulation(true); 
     }
 
     function loadRefImage(filename) { 
@@ -890,13 +1122,35 @@
         fd.append('image', file); 
         const res = await fetch('/matches/editor/reference/upload/', { method: 'POST', body: fd }); 
         const d = await res.json(); 
-        if (d.status === 'ok') loadRefImage(d.path); 
+        if (d.status === 'ok') loadRefImage(d.filename); 
     };
     document.getElementById('ref-opacity').oninput = (e) => refOpacity = parseFloat(e.target.value);
     async function save(run) {
         const saveBtn = document.getElementById('save-btn'); const originalText = saveBtn.innerText; saveBtn.disabled = true; saveBtn.innerText = 'Saving...';
         try {
-            const p = { path: currentPath, name: document.getElementById('file-name').value, width: parseInt(document.getElementById('map-w').value), height: parseInt(document.getElementById('map-h').value), entities, triggers, reference_image: refImageFilename || undefined };
+            // Segregate Starting Points from physical Entities
+            const spawnPoints = {};
+            const physicalEntities = [];
+            
+            entities.forEach(e => {
+                if (e.type === 'start_location') {
+                    spawnPoints[e.owner] = { x: e.x, y: e.y };
+                } else {
+                    physicalEntities.push(e);
+                }
+            });
+
+            const p = { 
+                path: currentPath, 
+                name: document.getElementById('file-name').value, 
+                width: parseInt(document.getElementById('map-w').value), 
+                height: parseInt(document.getElementById('map-h').value), 
+                spawn_points: spawnPoints,
+                entities: physicalEntities, 
+                triggers, 
+                reference_image: refImageFilename || undefined,
+                version: 1.1 // Modern center-based coordinate system
+            };
             const res = await fetch('/matches/editor/save/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) });
             const r = await res.json();
             if (r.status === 'ok') { 
@@ -907,55 +1161,83 @@
         } catch (err) { alert('Save failed: ' + err.message); saveBtn.innerText = originalText; saveBtn.disabled = false; }
     }
 
+    function saveAs() {
+        const currentName = document.getElementById('file-name').value;
+        const newName = prompt("Enter a new name for this scenario:", currentName + "_copy");
+        
+        if (newName === null || newName.trim() === "") {
+            return; // Cancelled or empty
+        }
+        
+        document.getElementById('file-name').value = newName.trim();
+        currentPath = null;
+        save(false);
+    }
+
+    function goHome() {
+        if (confirm('Go back to menu? Unsaved changes will be lost.')) {
+            document.getElementById('screen-editor').style.display = 'none';
+            document.getElementById('screen-select').style.display = 'flex';
+            refreshList();
+        }
+    }
+
     async function runSimulation() {
-        const runBtn = document.getElementById('run-btn');
-        runBtn.disabled = true; runBtn.innerText = 'Simulating...';
+        await requestSimulation(true);
+    }
+
+    async function requestSimulation(isInitial = false) {
         const p = { name: document.getElementById('file-name').value, width: mapW, height: mapH, entities, triggers };
         try {
             const res = await fetch('/matches/editor/run/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) });
             const r = await res.json();
             if (r.status === 'ok') {
                 replayData = processReplay(r.history); 
-                navGrid = r.static_grid; // Store the nav grid
-                isPlaying = true; currentTick = 0;
-                lastFrameTime = performance.now();
-                document.getElementById('sidebar-design').style.display = 'none';
-                document.getElementById('sidebar-simulate').style.display = 'flex';
-                document.getElementById('playback-bar').style.display = 'flex';
-                document.getElementById('run-btn').style.display = 'none';
-                document.getElementById('stop-btn').style.display = 'block';
+                navGrid = r.static_grid;
+                
+                if (isInitial) {
+                    isPlaying = false;
+                    currentTick = 0;
+                    lastFrameTime = performance.now();
+                }
+                
                 const timeline = document.getElementById('timeline');
-                timeline.max = Math.max(0, replayData.length - 1); timeline.value = 0;
+                timeline.max = Math.max(0, replayData.length - 1);
+                if (isInitial) timeline.value = 0;
+                
                 updatePlaybackUI();
-            } else throw new Error(r.message || 'Simulation failed');
-        } catch (err) { alert('Simulation failed: ' + err.message); }
-        finally { runBtn.disabled = false; runBtn.innerText = '▶ Run Simulation'; }
+            } else if (isInitial) throw new Error(r.message || 'Simulation failed');
+        } catch (err) { 
+            if (isInitial) alert('Simulation failed: ' + err.message); 
+            else console.error("Background simulation failed:", err);
+        }
     }
 
     function processReplay(deltas) {
+        if (!deltas || deltas.length === 0) return [];
         let frames = [];
-        // Deep copy initial state to avoid mutating the editor's global entities
-        let currentEntities = JSON.parse(JSON.stringify(entities)).map(e => {
-            const d = UNIT_DEFS[e.type] || { width: 1, height: 1 };
-            return { ...e, owner_id: e.owner, x: e.x + d.width/2, y: e.y + d.height/2 };
-        });
-        let currentResources = { p1: 50, p2: 50 };
         
-        // Frame 0
+        // Use the SERVER'S Tick 0 as the absolute base state
+        let baseState = deltas.find(d => d.tick === 0);
+        if (!baseState) return [];
+
+        let currentEntities = JSON.parse(JSON.stringify(baseState.entities));
+        let currentResources = JSON.parse(JSON.stringify(baseState.resources));
+        
         frames.push({ entities: JSON.parse(JSON.stringify(currentEntities)), resources: { ...currentResources } });
         
-        let maxTick = deltas.length > 0 ? deltas[deltas.length - 1].tick : 0;
         let deltaIdx = 0;
-        
+        while (deltaIdx < deltas.length && deltas[deltaIdx].tick === 0) deltaIdx++;
+
+        let maxTick = deltas.length > 0 ? deltas[deltas.length - 1].tick : 0;
         for (let t = 1; t <= maxTick; t++) {
-            // Apply all deltas up to and including this tick
             while (deltaIdx < deltas.length && deltas[deltaIdx].tick <= t) {
                 const d = deltas[deltaIdx];
                 if (d.entities) {
                     d.entities.forEach(entDelta => {
                         let ent = currentEntities.find(e => e.id === entDelta.id);
                         if (ent) Object.assign(ent, entDelta);
-                        else currentEntities.push({ ...JSON.parse(JSON.stringify(entDelta)) });
+                        else currentEntities.push(JSON.parse(JSON.stringify(entDelta)));
                     });
                 }
                 if (d.resources) Object.assign(currentResources, d.resources);
@@ -970,24 +1252,19 @@
         return frames;
     }
 
-    function stopSimulation() {
-        isPlaying = false; replayData = null; currentTick = 0;
-        document.getElementById('sidebar-design').style.display = 'block';
-        document.getElementById('sidebar-simulate').style.display = 'none';
-        document.getElementById('playback-bar').style.display = 'none';
-        document.getElementById('run-btn').style.display = 'block';
-        document.getElementById('stop-btn').style.display = 'none';
-        updateUI();
-    }
+
 
     function togglePlay() {
         isPlaying = !isPlaying;
-        document.getElementById('play-pause-btn').innerText = isPlaying ? '⏸' : '▶';
+        if (isPlaying) lastFrameTime = performance.now();
+        const b1 = document.getElementById('play-pause-btn');
+        if (b1) b1.innerText = isPlaying ? '⏸' : '▶';
     }
 
     function seek(tick) {
         currentTick = tick; isPlaying = false;
-        document.getElementById('play-pause-btn').innerText = '▶';
+        const b1 = document.getElementById('play-pause-btn');
+        if (b1) b1.innerText = '▶';
         updatePlaybackUI();
     }
 
@@ -995,14 +1272,14 @@
         if (!replayData) return;
         document.getElementById('timeline').value = currentTick;
         document.getElementById('timer').innerText = `${currentTick}/${replayData.length - 1}`;
+        updateInspector();
         const frame = replayData[currentTick];
-        if (frame.resources) {
-            document.getElementById('resource-panel').innerHTML = Object.entries(frame.resources).map(([pid, val]) => `
+        if (!frame || !frame.resources) return;
+        document.getElementById('resource-panel').innerHTML = Object.entries(frame.resources).map(([pid, val]) => `
                 <div style="display: flex; justify-content: space-between; font-size: 11px; background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 4px;">
                     <span style="color: ${pid === 'p1' ? '#3b82f6' : '#ef4444'}; font-weight: bold;">${pid.toUpperCase()}</span>
                     <span>${Math.floor(val)}</span>
                 </div>`).join('');
-        }
     }
     function startNew(w,h) { 
         mapW=w; mapH=h; entities=[]; triggers=[]; saveState(); 

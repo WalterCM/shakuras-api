@@ -131,10 +131,7 @@ def execute_scenario(scenario_data):
             entity_id=entity_config.get('id')
         )
         
-        # Center entities (they are placed at top-left in Editor/YAML)
-        entity.pos.x += entity.width / 2.0
-        entity.pos.y += entity.height / 2.0
-        
+        # Entities are already centered by the editor/YAML migration (v1.1+)
         sim.add_entity(entity)
     
     # 6. Register triggers
