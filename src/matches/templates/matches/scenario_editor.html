@@ -134,7 +134,14 @@
         .inspector {
             background: rgba(15,23,42,0.6); border: 1px solid rgba(255,255,255,0.1);
             border-radius: 12px; padding: 12px; font-size: 12px;
+            max-height: 400px; overflow-y: auto;
         }
+        .unit-card {
+            background: rgba(255,255,255,0.05); border-radius: 8px; padding: 8px; margin-bottom: 8px;
+            border-left: 3px solid var(--accent); display: flex; flex-direction: column; gap: 2px;
+        }
+        .hp-bar-bg { background: rgba(0,0,0,0.3); height: 4px; border-radius: 2px; overflow: hidden; margin-top: 2px; }
+        .hp-bar-fill { height: 100%; background: #10b981; transition: width 0.2s; }
 
         .editor-container {
             flex: 1; position: relative; background: #020617;
@@ -298,11 +305,6 @@
             <div class="control-group">
                 <label>Resources</label>
                 <div id="resource-panel" style="display: flex; flex-direction: column; gap: 8px;"></div>
-            </div>
-
-            <div class="control-group" style="flex: 1; min-height: 200px; display: flex; flex-direction: column;">
-                <label>Action Log</label>
-                <div id="delta-log" style="flex: 1; background: rgba(15,23,42,0.4); border-radius: 12px; padding: 10px; font-size: 10px; overflow-y: auto; font-family: 'JetBrains Mono', monospace; border: 1px solid rgba(255,255,255,0.05);"></div>
             </div>
         </div>
 
@@ -970,54 +972,51 @@
             document.getElementById('ins-orders').innerHTML = '';
             return;
         }
-        if (selectedIds.length > 1) {
-            document.getElementById('ins-name').textContent = `${selectedIds.length} items selected`;
-            document.getElementById('ins-orders').innerHTML = '';
-            return;
-        }
-        
-        const id = selectedIds[0];
-        const e = entities.find(ent => ent.id === id);
-        if (!e) return;
-        
-        document.getElementById('ins-name').textContent = `${(FRIENDLY_NAMES[e.type] || e.type).toUpperCase()} (${e.owner})`;
+
+        document.getElementById('ins-name').textContent = `${selectedIds.length} items selected`;
         
         let html = '';
-        
-        // Simulation Stats - Reconstruct state from deltas
-        if (replayData && replayData[currentTick]) {
-            // Helper to find latest value for a property with unit definition fallback
-            const getLatest = (prop, fallback) => {
+        selectedIds.forEach(id => {
+            const e = entities.find(ent => ent.id === id);
+            if (!e) return;
+
+            const name = (FRIENDLY_NAMES[e.type] || e.type).toUpperCase();
+            const ownerColor = e.owner === 'p1' ? 'var(--p1-color)' : (e.owner === 'p2' ? 'var(--p2-color)' : 'var(--neutral-color)');
+            
+            // Reconstruct state from replay if available
+            let curHP = e.hp || 0;
+            let curMax = e.max_hp || 100;
+            let curStatus = e.status || 'idle';
+            
+            if (replayData && replayData[currentTick]) {
                 for (let t = currentTick; t >= 0; t--) {
                     const frameEnt = replayData[t].entities?.find(ent => ent.id === id);
-                    if (frameEnt && frameEnt[prop] !== undefined) return frameEnt[prop];
+                    if (frameEnt) {
+                        if (frameEnt.hp !== undefined) curHP = frameEnt.hp;
+                        if (frameEnt.max_hp !== undefined) curMax = frameEnt.max_hp;
+                        if (frameEnt.status !== undefined) curStatus = frameEnt.status;
+                        break;
+                    }
                 }
-                // If not in replay, try unit definitions for stats
-                const def = UNIT_DEFS[e.type] || {};
-                if (prop === 'hp' || prop === 'max_hp') return def.hp || fallback;
-                return e[prop] !== undefined ? e[prop] : fallback;
-            };
+            }
 
-            const curHP = getLatest('hp', 0);
-            const curMax = getLatest('max_hp', 0);
-            const curStatus = getLatest('status', 'idle');
-            const curX = getLatest('x', e.x);
-            const curY = getLatest('y', e.y);
+            const hpPercent = (curHP / curMax) * 100;
+            const statusColor = curStatus === 'idle' ? 'var(--text-dim)' : 'var(--accent)';
 
-            html += `<div style="font-size: 11px; margin-bottom: 12px; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 6px; border-left: 2px solid var(--accent);">
-                <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span>HP:</span><span style="font-weight:bold;">${Math.floor(Number(curHP) || 0)}/${curMax || 0}</span></div>
-                <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span>Pos:</span><span>${Number(curX).toFixed(1)}, ${Number(curY).toFixed(1)}</span></div>
-                <div style="display:flex; justify-content:space-between;"><span>Status:</span><span style="color:var(--accent);">${String(curStatus).toUpperCase()}</span></div>
-            </div>`;
-        }
-        
-        // Scenario Instructions (Triggers)
-        const t = triggers.filter(tr => tr.entity === id).sort((a, b) => a.tick - b.tick);
-        html += `<label style="font-size:9px; margin-bottom:4px; display:block;">Tactical Orders</label>`;
-        html += t.map(tr => `<div style="font-size:11px; margin-bottom:4px; border-left:2px solid rgba(255,255,255,0.2); padding-left:8px; display:flex; justify-content:space-between;">
-            <span>T${tr.tick}: ${tr.action.type.toUpperCase()}</span>
-            <button onclick="removeTrigger('${tr.entity}', ${tr.tick})" style="background:none; border:none; color:var(--danger); cursor:pointer; font-size:10px;">×</button>
-        </div>`).join('');
+            html += `
+                <div class="unit-card" style="border-left-color: ${ownerColor}">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-weight:600; font-size:10px;">${name}</span>
+                        <span style="font-size:9px; color:${statusColor}">${curStatus.toUpperCase()}</span>
+                    </div>
+                    <div class="hp-bar-bg"><div class="hp-bar-fill" style="width:${hpPercent}%"></div></div>
+                    <div style="font-size:9px; margin-top:2px; opacity:0.6; display:flex; justify-content:space-between;">
+                        <span>ID: ${id}</span>
+                        <span>${Math.floor(curHP)}/${curMax}</span>
+                    </div>
+                </div>
+            `;
+        });
         
         document.getElementById('ins-orders').innerHTML = html;
     }

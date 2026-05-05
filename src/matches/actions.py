@@ -66,7 +66,7 @@ class GatherAction(Action):
         # Move towards patch
         actual_dist = rect_dist(entity.pos, entity.width, entity.height, patch.pos, patch.width, patch.height)
         
-        if actual_dist <= entity.range:
+        if actual_dist <= entity.range + 0.1: # Added tolerance
             # Arrived at patch - check if we should stay or look for a free one
             if patch.occupied_by is None or patch.occupied_by == entity.id:
                 # It's free! Claim it
@@ -88,7 +88,7 @@ class GatherAction(Action):
         # Check actual geometric distance to perimeter
         dist = rect_dist(entity.pos, entity.width, entity.height, patch.pos, patch.width, patch.height)
         
-        if dist <= 0.1:
+        if dist <= 0.2: # Increased tolerance from 0.1
             # We are touching! Start mining
             self.phase = 'mining'
             entity.waypoints = []
@@ -103,7 +103,7 @@ class GatherAction(Action):
         # Follow path or move towards nearest point
         if entity.waypoints:
             target = entity.waypoints[0]
-            if entity.pos.dist_to(target) < 0.5:
+            if entity.pos.dist_to(target) < 0.2:
                 entity.waypoints.pop(0)
                 if entity.waypoints:
                     target = entity.waypoints[0]
@@ -167,7 +167,7 @@ class GatherAction(Action):
         # Follow path if we have one
         if entity.waypoints:
             target = entity.waypoints[0]
-            if entity.pos.dist_to(target) < 0.5:
+            if entity.pos.dist_to(target) < 0.2:
                 entity.waypoints.pop(0)
                 if entity.waypoints:
                     target = entity.waypoints[0]
@@ -300,7 +300,7 @@ class MoveAction(Action):
         target = entity.waypoints[0]
         dist = entity.pos.dist_to(target)
         
-        if dist < 0.5:
+        if dist < 0.2: # Reduced from 0.5
             entity.waypoints.pop(0)
             if not entity.waypoints:
                 entity.action = None

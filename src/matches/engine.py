@@ -264,7 +264,7 @@ class Entity:
             diff = target_pos - self.pos
             dist = diff.length()
             if dist > 0.01:
-                move_dist = min(self.speed, dist)
+                move_dist = min(self.speed * game_state.tick_duration, dist)
                 self.pos += diff.normalize() * move_dist
             return
 
@@ -273,7 +273,7 @@ class Entity:
             diff = target_pos - self.pos
             dist = diff.length()
             if dist > 0.01:
-                move_dist = min(self.speed, dist)
+                move_dist = min(self.speed * game_state.tick_duration, dist)
                 self.pos += diff.normalize() * move_dist
             return
 
@@ -287,24 +287,23 @@ class Entity:
         direction = diff.normalize()
         
         # Probe ahead incrementally to prevent jumping over thin walls
-        probe_dist = max(1.0, self.speed)
+        # Use a smaller step size and probe distance for precision
+        step = min(0.05, self.speed * game_state.tick_duration / 2)
+        probe_dist = self.speed * game_state.tick_duration * 2.0 # Probe 2 ticks ahead
+        
         from .actions import GatherAction
         am_gathering = isinstance(self.action, GatherAction)
         # Gathering SCVs get a tiny bit of leniency to touch the edge properly
         eps = 0.05 if am_gathering else 0.2
 
-        # If we are ALREADY blocked at current position, something is wrong (e.g. spawned inside building)
-        # Trigger ghost mode to let the unit "get out"
+        # If we are ALREADY blocked at current position, something is wrong
         if game_state.nav_grid.is_area_blocked(self.pos.x, self.pos.y, self.width, self.height, check_dynamic=False, entity=self, eps=eps):
             self.ghost_mode_ticks = 30
 
-        # Don't check dynamic collisions if in ghost mode
         check_dynamic = (not am_gathering) and (self.ghost_mode_ticks <= 0)
-        # If in ghost mode, also be more lenient with static collisions to allow getting out
         current_eps = 0.4 if self.ghost_mode_ticks > 0 else eps
         
         is_blocked = False
-        step = 0.5
         d = step
         while d <= probe_dist:
             check_pos = self.pos + direction * d
@@ -313,17 +312,18 @@ class Entity:
                 break
             d += step
             
-        if not is_blocked:
-            probe_pos = self.pos + direction * probe_dist
-            if game_state.nav_grid.is_area_blocked(probe_pos.x, probe_pos.y, self.width, self.height, check_dynamic=check_dynamic, entity=self, eps=current_eps, ignore_static_id=ignore_static_id):
-                is_blocked = True
+        # ALWAYS check the exact move destination for safety
+        move_dist = min(self.speed * game_state.tick_duration, dist)
+        dest_pos = self.pos + direction * move_dist
+        if not is_blocked and game_state.nav_grid.is_area_blocked(dest_pos.x, dest_pos.y, self.width, self.height, check_dynamic=check_dynamic, entity=self, eps=current_eps, ignore_static_id=ignore_static_id):
+            is_blocked = True
         
         # If we're currently sliding, check if we've cleared the obstacle
         if self.slide_direction is not None:
             # Exit slide mode if the direct path is now clear
             if not is_blocked:
                 self.slide_direction = None
-                move_dist = min(self.speed, dist)
+                move_dist = min(self.speed * game_state.tick_duration, dist)
                 self.pos += direction * move_dist
             else:
                 self.slide_logic(target_pos, game_state, ignore_static_id=ignore_static_id)
@@ -333,10 +333,8 @@ class Entity:
         else:
             # No obstacle, move directly
             self.slide_direction = None
-            move_dist = min(self.speed, dist)
+            move_dist = min(self.speed * game_state.tick_duration, dist)
             self.pos += direction * move_dist
-
-
 
     def slide_logic(self, target_pos, game_state, ignore_static_id=None):
         """Finds a tangent path around an obstacle and sticks to it.
@@ -350,7 +348,7 @@ class Entity:
         orig_dir = orig_diff.normalize()
         
         def get_clearance(test_dir, max_d=3.5):
-            step = 0.25
+            step = 0.1 # Finer steps for sliding
             d = step
             last_safe = 0
             # Gathering SCVs get a tiny bit of leniency to touch the edge properly
@@ -424,7 +422,7 @@ class Entity:
             self.slide_direction = 'right' if self.slide_direction == 'left' else 'left'
             return # Move next tick
             
-        move_dist = min(self.speed, orig_diff.length())
+        move_dist = min(self.speed * game_state.tick_duration, orig_diff.length())
             
         if best_angle == 0 and best_clearance >= move_dist:
             self.slide_direction = None # We are clear!
@@ -485,8 +483,8 @@ class Entity:
 
             dist = rect_dist(self.pos, self.width, self.height, other.pos, other.width, other.height)
             if dist <= 0: # Overlapping
-                # Repel
-                overlap_depth = 0.15 # Slightly smaller push
+                # Repel with a force proportional to tick duration to avoid "variable speed" jumps
+                overlap_depth = 0.05 * game_state.tick_duration
                 push_dir = (self.pos - other.pos).normalize()
                 if push_dir.length_sq() < 0.01:
                     push_dir = Vector2D(random.uniform(-1,1), random.uniform(-1,1)).normalize()
@@ -569,6 +567,7 @@ class MatchSimulator:
             ProductionAI(self.player2_id)
         ]
         self.triggers = {}  # tick -> list of {'entity_id': str, 'action': Action}
+        self.tick_duration = 0.1 # Standard simulation step (10 ticks per second)
 
     def add_minerals(self, player_id, amount):
         if player_id in self.resources:
@@ -603,26 +602,6 @@ class MatchSimulator:
         # Update Nav Grid for buildings/minerals
         if entity.definition.get('category') in ['building', 'resource']:
             self.nav_grid.set_static_rect(entity.pos.x, entity.pos.y, entity.width, entity.height, entity.id)
-
-        # Assign default actions to newly spawned units
-        from .actions import GatherAction, AttackAction
-        if entity.type == 'scv':
-            # Use smart distribution (even for initial/produced scvs)
-            # Use max_dist=50 for initial spawns to accommodate slightly spread layouts
-            patch_id = GatherAction(None)._find_best_patch(entity, self, max_dist=50.0)
-            if patch_id:
-                entity.set_action(GatherAction(patch_id))
-                entity.action.prepare(entity, self)
-        
-        elif entity.type in ['marine', 'zealot', 'zergling']:
-            # Combat units attack nearest enemy
-            enemies = [e for e in self.entities.values()
-                      if e.owner_id != entity.owner_id and e.owner_id != 'neutral'
-                      and e.status != 'dead' and e.type != 'mineral_patch']
-            if enemies:
-                closest = min(enemies, key=lambda e: entity.pos.dist_to_sq(e.pos))
-                entity.set_action(AttackAction(closest.id))
-                entity.action.prepare(entity, self)
 
     def setup_match(self):
         # 1. Minerals FIRST so scvs can find them when spawned
