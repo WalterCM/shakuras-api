@@ -349,15 +349,15 @@
     let selectedIds = [];
     
     // Simulation state
-    let isPlaying = false;
-    let currentTick = 0;
-    let replayData = null;
+    let isPlaying = false, currentTick = 0, lastFrameTime = 0, replayData = null;
+    let isSimulating = false; // NEW: track simulation state
+    let playRequestedWhileSimulating = false; // NEW: auto-play after load
     let navGrid = null;
     let playbackSpeed = 1;
-    let lastFrameTime = 0;
     let currentTool = 'cursor', currentOwner = 'p1', currentCategory = 'neutral';
     let scale = 4, offsetX = 0, offsetY = 0, isPanning = false, lastMousePos = { x: 0, y: 0 };
     let mapW = 128, mapH = 128, currentPath = null;
+    let serverTickDuration = 0.1;
     let mouseWorldPos = { x: 0, y: 0 };
     
     // Multi-select & Drag State
@@ -562,7 +562,7 @@
         // Advance simulation tick
         if (isPlaying && replayData) {
             const elapsed = timestamp - lastFrameTime;
-            const nextFrameDelay = 100 / playbackSpeed; // 10 ticks per second at 1.0 speed
+            const nextFrameDelay = (serverTickDuration * 1000) / playbackSpeed;
             
             if (elapsed >= nextFrameDelay) {
                 currentTick++;
@@ -721,6 +721,16 @@
             }
             ctx.setLineDash([]);
         });
+
+        if (isSimulating) {
+            ctx.setTransform(1,0,0,1,0,0);
+            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 16px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(playRequestedWhileSimulating ? 'Starting soon...' : 'Simulating...', canvas.width/2, canvas.height/2);
+        }
     }
 
     canvas.addEventListener('mousedown', (e) => {
@@ -938,7 +948,7 @@
     canvas.addEventListener('wheel', (e) => {
         e.preventDefault(); const r = canvas.getBoundingClientRect(); const mx = e.clientX - r.left, my = e.clientY - r.top;
         const wx = (mx - canvas.width/2 - offsetX) / scale, wy = (my - canvas.height/2 - offsetY) / scale;
-        scale = Math.max(0.5, Math.min(scale * (e.deltaY > 0 ? 0.9 : 1.1), 20));
+        scale = Math.max(0.5, Math.min(scale * (e.deltaY > 0 ? 0.9 : 1.1), 80));
         offsetX = mx - canvas.width/2 - wx * scale; offsetY = my - canvas.height/2 - wy * scale;
         updateUI();
     });
@@ -1044,6 +1054,13 @@
     }
 
     async function openFile(path) {
+        // Reset current state to avoid leakage if load fails
+        entities = [];
+        triggers = [];
+        replayData = null;
+        currentTick = 0;
+        isPlaying = false;
+
         const res = await fetch(`/matches/editor/load/?path=${encodeURIComponent(path)}`);
         const d = await res.json();
         const s = d.scenario;
@@ -1186,13 +1203,25 @@
     }
 
     async function requestSimulation(isInitial = false) {
-        const p = { name: document.getElementById('file-name').value, width: mapW, height: mapH, entities, triggers };
+        if (isSimulating) return;
+        isSimulating = true;
+        updateUI();
+
+        const p = { 
+            name: document.getElementById('file-name').value, 
+            width: mapW, 
+            height: mapH, 
+            entities, 
+            triggers,
+            config: { max_ticks: 100 } // Always ensure at least 100 ticks for preview
+        };
         try {
             const res = await fetch('/matches/editor/run/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) });
             const r = await res.json();
             if (r.status === 'ok') {
                 replayData = processReplay(r.history); 
                 navGrid = r.static_grid;
+                serverTickDuration = r.tick_duration || 0.1;
                 
                 if (isInitial) {
                     isPlaying = false;
@@ -1204,9 +1233,22 @@
                 timeline.max = Math.max(0, replayData.length - 1);
                 if (isInitial) timeline.value = 0;
                 
+                isSimulating = false;
+                if (playRequestedWhileSimulating) {
+                    isPlaying = true;
+                    playRequestedWhileSimulating = false;
+                    lastFrameTime = performance.now();
+                }
                 updatePlaybackUI();
-            } else if (isInitial) throw new Error(r.message || 'Simulation failed');
+                updateUI();
+            } else if (isInitial) {
+                isSimulating = false;
+                updateUI();
+                throw new Error(r.message || 'Simulation failed');
+            }
         } catch (err) { 
+            isSimulating = false;
+            updateUI();
             if (isInitial) alert('Simulation failed: ' + err.message); 
             else console.error("Background simulation failed:", err);
         }
@@ -1254,10 +1296,24 @@
 
 
     function togglePlay() {
+        if (isSimulating) {
+            playRequestedWhileSimulating = !playRequestedWhileSimulating;
+            updateUI();
+            return;
+        }
+        if (!replayData) return;
         isPlaying = !isPlaying;
         if (isPlaying) lastFrameTime = performance.now();
         const b1 = document.getElementById('play-pause-btn');
-        if (b1) b1.innerText = isPlaying ? '⏸' : '▶';
+        if (b1) {
+            if (isSimulating) {
+                b1.innerText = playRequestedWhileSimulating ? '⌛...' : '▶';
+                b1.style.opacity = '0.5';
+            } else {
+                b1.innerText = isPlaying ? '⏸' : '▶';
+                b1.style.opacity = '1';
+            }
+        }
     }
 
     function seek(tick) {

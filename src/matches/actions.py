@@ -66,7 +66,10 @@ class GatherAction(Action):
         # Move towards patch
         actual_dist = rect_dist(entity.pos, entity.width, entity.height, patch.pos, patch.width, patch.height)
         
-        if actual_dist <= entity.range + 0.1: # Added tolerance
+        dt = game_state.tick_duration
+        arrival_threshold = entity.speed * dt * 1.1 
+        
+        if actual_dist <= entity.range + arrival_threshold:
             # Arrived at patch - check if we should stay or look for a free one
             if patch.occupied_by is None or patch.occupied_by == entity.id:
                 # It's free! Claim it
@@ -87,13 +90,11 @@ class GatherAction(Action):
                     pass
         # Check actual geometric distance to perimeter
         dist = rect_dist(entity.pos, entity.width, entity.height, patch.pos, patch.width, patch.height)
-        
-        if dist <= 0.2: # Increased tolerance from 0.1
+        if dist <= arrival_threshold:
             # We are touching! Start mining
             self.phase = 'mining'
             entity.waypoints = []
             return
-
         # Pathfinding for long distances
         if not entity.waypoints and entity.pos.dist_to(patch.pos) > 5.0:
             raw_path = game_state.pathfinder.find_path(entity.pos, patch.pos, entity=entity)
@@ -103,7 +104,9 @@ class GatherAction(Action):
         # Follow path or move towards nearest point
         if entity.waypoints:
             target = entity.waypoints[0]
-            if entity.pos.dist_to(target) < 0.2:
+            dt = game_state.tick_duration
+            arrival_threshold = entity.speed * dt * 1.1
+            if entity.pos.dist_to(target) < arrival_threshold:
                 entity.waypoints.pop(0)
                 if entity.waypoints:
                     target = entity.waypoints[0]
@@ -167,7 +170,9 @@ class GatherAction(Action):
         # Follow path if we have one
         if entity.waypoints:
             target = entity.waypoints[0]
-            if entity.pos.dist_to(target) < 0.2:
+            dt = game_state.tick_duration
+            arrival_threshold = entity.speed * dt * 1.1
+            if entity.pos.dist_to(target) < arrival_threshold:
                 entity.waypoints.pop(0)
                 if entity.waypoints:
                     target = entity.waypoints[0]
@@ -298,9 +303,11 @@ class MoveAction(Action):
 
         # 2. Check if we've reached the current waypoint
         target = entity.waypoints[0]
+        dt = game_state.tick_duration
+        arrival_threshold = entity.speed * dt * 1.1
         dist = entity.pos.dist_to(target)
         
-        if dist < 0.2: # Reduced from 0.5
+        if dist < arrival_threshold:
             entity.waypoints.pop(0)
             if not entity.waypoints:
                 entity.action = None

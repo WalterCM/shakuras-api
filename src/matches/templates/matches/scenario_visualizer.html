@@ -254,6 +254,7 @@
         let currentTick = 0;
         let isPlaying = false;
         let playbackSpeed = 1;
+        let serverTickDuration = 0.1;
         let lastFrameTime = performance.now();
 
         // Camera State
@@ -316,6 +317,7 @@
                 
                 replayData = result.replay;
                 staticGrid = result.static_grid;
+                serverTickDuration = result.tick_duration || 0.1;
                 mapWidth = result.width || 128;
                 mapHeight = result.height || 128;
                 baseScale = canvas.width / Math.max(mapWidth, mapHeight);
@@ -356,7 +358,7 @@
             e.preventDefault();
             const zoomSpeed = 0.1;
             const delta = e.deltaY > 0 ? -zoomSpeed : zoomSpeed;
-            const nextScale = Math.min(Math.max(camera.scale + delta, 0.5), 10);
+            const nextScale = Math.min(Math.max(camera.scale + delta, 0.5), 40);
 
             const rect = canvas.getBoundingClientRect();
             const mouseX = e.clientX - rect.left;
@@ -648,7 +650,7 @@
         function animate(timestamp) {
             if (isPlaying && replayData) {
                 const elapsed = timestamp - lastFrameTime;
-                const nextFrameDelay = 100 / playbackSpeed;
+                const nextFrameDelay = (serverTickDuration * 1000) / playbackSpeed;
                 if (elapsed > nextFrameDelay) {
                     if (currentTick < MAX_TICKS) {
                         currentTick++;

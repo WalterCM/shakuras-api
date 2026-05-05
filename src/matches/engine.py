@@ -7,6 +7,15 @@ from .utils import Vector2D
 from .pathfinding import AStarPathfinder
 from .actions import GatherAction, AttackAction, MoveAction, HoldAction
 
+# --- SIMULATION CONSTANTS ---
+DEFAULT_TICK_DURATION = 0.042    # Seconds per tick (approx 23.81 FPS - StarCraft "Fastest" speed)
+GAME_SPEED_MULTIPLIER = 1.56     # Ratio between "Normal" (0.067s) and "Fastest" (0.042s)
+REPULSION_FORCE_PER_SEC = 0.5 * GAME_SPEED_MULTIPLIER 
+COLLISION_PROBE_TICKS = 5.0      # How many ticks ahead to check for obstacles
+COLLISION_STEP_RATIO = 0.5       # Ratio of current tick movement for collision probing steps
+WAYPOINT_THRESHOLD_RATIO = 1.1   # Multiplier for tick displacement to determine arrival
+# ----------------------------
+
 class Map:
     """Stores static map data: dimensions, spawns, and terrain."""
     def __init__(self, name="Default", width=128, height=128, spawn_points=None, minerals=None, entities=None):
@@ -259,37 +268,34 @@ class Entity:
 
     def move_towards(self, target_pos, game_state, ignore_static_id=None):
         """Moves the entity towards a target position with grid-aware collision and sliding."""
+        diff = target_pos - self.pos
+        dist = diff.length()
+        dt = game_state.tick_duration
+        effective_speed = self.speed * (GAME_SPEED_MULTIPLIER if hasattr(self, 'speed') else 1.0)
+        
+        if dist < 0.01:
+            return
+
         # Backward compatibility: if no nav_grid, just move directly
         if not hasattr(game_state, 'nav_grid') or game_state.nav_grid is None:
-            diff = target_pos - self.pos
-            dist = diff.length()
-            if dist > 0.01:
-                move_dist = min(self.speed * game_state.tick_duration, dist)
-                self.pos += diff.normalize() * move_dist
+            move_dist = min(effective_speed * dt, dist)
+            self.pos += diff.normalize() * move_dist
             return
 
         if self.ghost_mode_ticks > 0:
             self.ghost_mode_ticks -= 1
-            diff = target_pos - self.pos
-            dist = diff.length()
-            if dist > 0.01:
-                move_dist = min(self.speed * game_state.tick_duration, dist)
-                self.pos += diff.normalize() * move_dist
+            move_dist = min(effective_speed * dt, dist)
+            self.pos += diff.normalize() * move_dist
             return
 
         self.is_stuck_check()
-
-        diff = target_pos - self.pos
-        dist = diff.length()
-        if dist < 0.01:
-            return
-
         direction = diff.normalize()
+        move_dist = min(effective_speed * dt, dist)
         
         # Probe ahead incrementally to prevent jumping over thin walls
-        # Use a smaller step size and probe distance for precision
-        step = min(0.05, self.speed * game_state.tick_duration / 2)
-        probe_dist = self.speed * game_state.tick_duration * 2.0 # Probe 2 ticks ahead
+        # The probe distance is proportional to speed and time (X ticks ahead)
+        probe_dist = effective_speed * dt * COLLISION_PROBE_TICKS
+        step = min(0.05, move_dist * COLLISION_STEP_RATIO)
         
         from .actions import GatherAction
         am_gathering = isinstance(self.action, GatherAction)
@@ -313,7 +319,6 @@ class Entity:
             d += step
             
         # ALWAYS check the exact move destination for safety
-        move_dist = min(self.speed * game_state.tick_duration, dist)
         dest_pos = self.pos + direction * move_dist
         if not is_blocked and game_state.nav_grid.is_area_blocked(dest_pos.x, dest_pos.y, self.width, self.height, check_dynamic=check_dynamic, entity=self, eps=current_eps, ignore_static_id=ignore_static_id):
             is_blocked = True
@@ -323,7 +328,6 @@ class Entity:
             # Exit slide mode if the direct path is now clear
             if not is_blocked:
                 self.slide_direction = None
-                move_dist = min(self.speed * game_state.tick_duration, dist)
                 self.pos += direction * move_dist
             else:
                 self.slide_logic(target_pos, game_state, ignore_static_id=ignore_static_id)
@@ -333,7 +337,6 @@ class Entity:
         else:
             # No obstacle, move directly
             self.slide_direction = None
-            move_dist = min(self.speed * game_state.tick_duration, dist)
             self.pos += direction * move_dist
 
     def slide_logic(self, target_pos, game_state, ignore_static_id=None):
@@ -346,9 +349,14 @@ class Entity:
         
         orig_diff = target_pos - self.pos
         orig_dir = orig_diff.normalize()
+        dt = game_state.tick_duration
+        effective_speed = self.speed * GAME_SPEED_MULTIPLIER
+        move_dist = min(effective_speed * dt, orig_diff.length())
         
         def get_clearance(test_dir, max_d=3.5):
-            step = 0.1 # Finer steps for sliding
+            dt = game_state.tick_duration
+            effective_speed = self.speed * GAME_SPEED_MULTIPLIER
+            step = min(0.1, effective_speed * dt) # Scale search step
             d = step
             last_safe = 0
             # Gathering SCVs get a tiny bit of leniency to touch the edge properly
@@ -361,39 +369,38 @@ class Entity:
                 d += step
             return last_safe
 
-        # If no direction chosen, pick the one with the best immediate opening
+        # If no direction chosen, pick the one that clears the obstacle with MINIMAL deviation
         if self.slide_direction is None:
-            best_left_clear = -1
-            best_left_angle = 180
+            # We want the SMALLEST angle that gives us SUFFICIENT clearance to move
+            # Sufficient clearance is roughly 1.5x our movement distance to avoid jitter
+            sufficient_clearance = move_dist * 2.0 
+            
+            best_left_angle = 181
+            best_right_angle = 181
+            
             for angle in range(0, 181, 15):
                 rad = math.radians(angle)
-                test_dir = Vector2D(
+                # Left sweep (CCW)
+                test_dir_l = Vector2D(
                     orig_dir.x * math.cos(rad) - orig_dir.y * math.sin(rad),
                     orig_dir.x * math.sin(rad) + orig_dir.y * math.cos(rad)
                 )
-                c = get_clearance(test_dir)
-                if c > best_left_clear:
-                    best_left_clear = c
+                if best_left_angle > 180 and get_clearance(test_dir_l) >= sufficient_clearance:
                     best_left_angle = angle
-                    
-            best_right_clear = -1
-            best_right_angle = 180
-            for angle in range(0, 181, 15):
-                rad = math.radians(-angle)
-                test_dir = Vector2D(
-                    orig_dir.x * math.cos(rad) - orig_dir.y * math.sin(rad),
-                    orig_dir.x * math.sin(rad) + orig_dir.y * math.cos(rad)
+                
+                # Right sweep (CW)
+                rad_r = -rad
+                test_dir_r = Vector2D(
+                    orig_dir.x * math.cos(rad_r) - orig_dir.y * math.sin(rad_r),
+                    orig_dir.x * math.sin(rad_r) + orig_dir.y * math.cos(rad_r)
                 )
-                c = get_clearance(test_dir)
-                if c > best_right_clear:
-                    best_right_clear = c
+                if best_right_angle > 180 and get_clearance(test_dir_r) >= sufficient_clearance:
                     best_right_angle = angle
-                    
-            if best_left_clear > best_right_clear:
-                self.slide_direction = 'left'
-            elif best_right_clear > best_left_clear:
-                self.slide_direction = 'right'
-            elif best_left_angle <= best_right_angle:
+                
+                if best_left_angle <= 180 and best_right_angle <= 180:
+                    break
+
+            if best_left_angle <= best_right_angle:
                 self.slide_direction = 'left'
             else:
                 self.slide_direction = 'right'
@@ -422,7 +429,9 @@ class Entity:
             self.slide_direction = 'right' if self.slide_direction == 'left' else 'left'
             return # Move next tick
             
-        move_dist = min(self.speed * game_state.tick_duration, orig_diff.length())
+        dt = game_state.tick_duration
+        effective_speed = self.speed * GAME_SPEED_MULTIPLIER
+        move_dist = min(effective_speed * dt, orig_diff.length())
             
         if best_angle == 0 and best_clearance >= move_dist:
             self.slide_direction = None # We are clear!
@@ -484,7 +493,7 @@ class Entity:
             dist = rect_dist(self.pos, self.width, self.height, other.pos, other.width, other.height)
             if dist <= 0: # Overlapping
                 # Repel with a force proportional to tick duration to avoid "variable speed" jumps
-                overlap_depth = 0.05 * game_state.tick_duration
+                overlap_depth = REPULSION_FORCE_PER_SEC * game_state.tick_duration
                 push_dir = (self.pos - other.pos).normalize()
                 if push_dir.length_sq() < 0.01:
                     push_dir = Vector2D(random.uniform(-1,1), random.uniform(-1,1)).normalize()
@@ -567,7 +576,7 @@ class MatchSimulator:
             ProductionAI(self.player2_id)
         ]
         self.triggers = {}  # tick -> list of {'entity_id': str, 'action': Action}
-        self.tick_duration = 0.1 # Standard simulation step (10 ticks per second)
+        self.tick_duration = DEFAULT_TICK_DURATION
 
     def add_minerals(self, player_id, amount):
         if player_id in self.resources:

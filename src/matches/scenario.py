@@ -105,34 +105,38 @@ def execute_scenario(scenario_data):
     engine_map = create_engine_map_from_config(scenario_data)
     
     # 2. Create simulator
+    max_ticks = 100
+    if scenario_data.get('config') and isinstance(scenario_data['config'], dict):
+        max_ticks = scenario_data['config'].get('max_ticks', 100)
+        
     sim = MatchSimulator(
         DummyPlayer('p1'),
         DummyPlayer('p2'),
         map_instance=engine_map,
-        max_ticks=scenario_data.get('config', {}).get('max_ticks', 100)
+        max_ticks=max_ticks
     )
     
     # 3. Disable AI controllers for scenarios
     sim.ai_controllers = []
     
-    # 4. Clear default entities — we define our own
-    sim.entities = {}
-    
     # 5. Create entities from YAML
-    for entity_config in scenario_data.get('entities', []):
-        if 'type' not in entity_config:
-            continue
-        
-        entity = Entity(
-            unit_type=entity_config['type'],
-            owner_id=entity_config.get('owner', 'neutral'),
-            x=entity_config.get('x', 0),
-            y=entity_config.get('y', 0),
-            entity_id=entity_config.get('id')
-        )
-        
-        # Entities are already centered by the editor/YAML migration (v1.1+)
-        sim.add_entity(entity)
+    entities_config = scenario_data.get('entities', [])
+    if not entities_config and scenario_data.get('spawn_points'):
+        # Procedural setup for legacy/simple scenarios
+        sim.setup_match()
+    else:
+        for entity_config in entities_config:
+            if 'type' not in entity_config:
+                continue
+            
+            entity = Entity(
+                unit_type=entity_config['type'],
+                owner_id=entity_config.get('owner', 'neutral'),
+                x=entity_config.get('x', 0),
+                y=entity_config.get('y', 0),
+                entity_id=entity_config.get('id')
+            )
+            sim.add_entity(entity)
     
     # 6. Register triggers
     for trigger in scenario_data.get('triggers', []):
@@ -150,7 +154,8 @@ def execute_scenario(scenario_data):
         'history': history,
         'static_grid': sim.nav_grid.static_grid,
         'width': sim.map_data.width,
-        'height': sim.map_data.height
+        'height': sim.map_data.height,
+        'tick_duration': sim.tick_duration
     }
 
 

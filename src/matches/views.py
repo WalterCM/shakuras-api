@@ -309,7 +309,8 @@ def run_scenario_api(request):
                 'replay': result['history'],
                 'static_grid': result['static_grid'],
                 'width': result.get('width', 128),
-                'height': result.get('height', 128)
+                'height': result.get('height', 128),
+                'tick_duration': result.get('tick_duration', 0.1)
             })
         except yaml.YAMLError as e:
             return JsonResponse({'status': 'error', 'message': f'YAML error: {str(e)}'}, status=400)
@@ -339,7 +340,8 @@ def run_scenario_upload_api(request):
                 'replay': result['history'],
                 'static_grid': result['static_grid'],
                 'width': result.get('width', 128),
-                'height': result.get('height', 128)
+                'height': result.get('height', 128),
+                'tick_duration': result.get('tick_duration', 0.1)
             })
         except yaml.YAMLError as e:
             return JsonResponse({'status': 'error', 'message': f'YAML error: {str(e)}'}, status=400)
@@ -360,7 +362,8 @@ def run_scenario_data_api(request):
                 'history': result['history'],
                 'static_grid': result['static_grid'],
                 'width': result.get('width', 128),
-                'height': result.get('height', 128)
+                'height': result.get('height', 128),
+                'tick_duration': result.get('tick_duration', 0.1)
             })
         except Exception as e:
             import traceback
