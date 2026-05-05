@@ -131,10 +131,9 @@ def execute_scenario(scenario_data):
             entity_id=entity_config.get('id')
         )
         
-        # Center minerals (they are placed at top-left in YAML)
-        if entity.type == 'mineral_patch':
-            entity.pos.x += entity.width / 2.0
-            entity.pos.y += entity.height / 2.0
+        # Center entities (they are placed at top-left in Editor/YAML)
+        entity.pos.x += entity.width / 2.0
+        entity.pos.y += entity.height / 2.0
         
         sim.add_entity(entity)
     

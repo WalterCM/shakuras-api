@@ -5,8 +5,8 @@ entities:
 - id: scv1
   type: scv
   owner: p1
-  x: 30
-  y: 32
+  x: 29
+  y: 29
 - id: m1
   type: mineral_patch
   owner: neutral
@@ -57,55 +57,35 @@ entities:
   owner: neutral
   x: 35
   y: 36
-- id: m11
-  type: mineral_patch
-  owner: neutral
-  x: 25
-  y: 37
-- id: m12
-  type: mineral_patch
-  owner: neutral
-  x: 26
-  y: 37
-- id: m13
-  type: mineral_patch
-  owner: neutral
-  x: 27
-  y: 37
-- id: m14
-  type: mineral_patch
-  owner: neutral
-  x: 28
-  y: 37
-- id: m15
-  type: mineral_patch
-  owner: neutral
-  x: 29
-  y: 37
-- id: m16
-  type: mineral_patch
-  owner: neutral
-  x: 30
-  y: 37
-- id: m17
-  type: mineral_patch
-  owner: neutral
-  x: 31
-  y: 37
-- id: m18
-  type: mineral_patch
-  owner: neutral
-  x: 32
-  y: 37
-- id: m19
-  type: mineral_patch
-  owner: neutral
-  x: 33
-  y: 37
 - id: m20
   type: mineral_patch
   owner: neutral
   x: 34
+  y: 37
+- id: mineral_patch_1777934814300
+  type: mineral_patch
+  owner: neutral
+  x: 32
+  y: 37
+- id: mineral_patch_1777934815241
+  type: mineral_patch
+  owner: neutral
+  x: 30
+  y: 37
+- id: mineral_patch_1777934816415
+  type: mineral_patch
+  owner: neutral
+  x: 28
+  y: 37
+- id: mineral_patch_1777934817457
+  type: mineral_patch
+  owner: neutral
+  x: 26
+  y: 37
+- id: mineral_patch_1777934818213
+  type: mineral_patch
+  owner: neutral
+  x: 24
   y: 37
 triggers:
 - tick: 0
@@ -113,5 +93,5 @@ triggers:
   action:
     type: move
     target:
-      x: 40
+      x: 42
       y: 41

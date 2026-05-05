@@ -344,3 +344,24 @@ def run_scenario_upload_api(request):
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
     return JsonResponse({'status': 'error', 'message': 'Only POST allowed'}, status=405)
+@csrf_exempt
+def run_scenario_data_api(request):
+    """API endpoint to run a scenario from JSON data directly (for instant preview)"""
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            from matches.scenario import execute_scenario
+            result = execute_scenario(data)
+            
+            return JsonResponse({
+                'status': 'ok', 
+                'history': result['history'],
+                'static_grid': result['static_grid'],
+                'width': result.get('width', 128),
+                'height': result.get('height', 128)
+            })
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+    return JsonResponse({'status': 'error', 'message': 'Only POST allowed'}, status=405)

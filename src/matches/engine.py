@@ -94,9 +94,14 @@ class NavigationGrid:
     
     def is_area_blocked(self, x, y, width, height, check_dynamic=True, entity=None):
         """Checks if a rectangular area is partially or fully blocked."""
-        # Use small epsilon to allow some "squeezing" through gaps
-        x1, y1 = math.floor(x - width/2 + 0.1), math.floor(y - height/2 + 0.1)
-        x2, y2 = math.floor(x + width/2 - 0.1), math.floor(y + height/2 - 0.1)
+        # Use larger epsilon (0.2) to allow squeezing through 1-tile gaps
+        # SCV is 0.7, Gap is 1.0. With 0.2 epsilon, we check an area of 0.3 centered at x.
+        # floor(center - 0.35 + 0.2) = floor(center - 0.15)
+        # floor(center + 0.35 - 0.2) = floor(center + 0.15)
+        # For center=30.5, both are 30. Correct.
+        eps = 0.2
+        x1, y1 = math.floor(x - width/2 + eps), math.floor(y - height/2 + eps)
+        x2, y2 = math.floor(x + width/2 - eps), math.floor(y + height/2 - eps)
         for ox in range(x1, x2 + 1):
             for oy in range(y1, y2 + 1):
                 if ox < 0 or ox >= self.width or oy < 0 or oy >= self.height:
@@ -161,6 +166,7 @@ class Entity:
         
         # Load definitions from YAML
         self.definition = UNIT_DEFINITIONS.get(unit_type, {})
+        self.speed = self.definition.get('speed', 0)
         self.hp = self.definition.get('hp', 100)
         self.max_hp = self.definition.get('max_hp', self.hp)
         self.damage = self.definition.get('damage', 0)
@@ -670,15 +676,16 @@ class MatchSimulator:
             'resources': self.resources.copy()
         })
 
-        # Execute triggers at tick 0 (before the main loop)
+        # Execute initial triggers (Tick 0)
         for trigger in self.triggers.get(0, []):
             entity = self.entities.get(trigger['entity_id'])
             if entity:
                 entity.set_action(trigger['action'])
                 entity.action.prepare(entity, self)
 
+        # 1. Main Simulation Loop
         for tick in range(1, self.max_ticks + 1):
-            # 1. Execute triggers for this tick
+            # Execute triggers for this tick
             for trigger in self.triggers.get(tick, []):
                 entity = self.entities.get(trigger['entity_id'])
                 if entity:

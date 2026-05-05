@@ -8,9 +8,10 @@ router.register('', views.MatchViewSet)
 app_name = 'matches'
 
 urlpatterns = [
-    path('editor/', views.UnifiedEditorView.as_view(), name='editor'),
+    path('editor/', views.ScenarioEditorView.as_view(), name='editor'),
     path('editor/load/', views.load_scenario_api, name='editor-load'),
     path('editor/save/', views.save_scenario_api, name='editor-save'),
+    path('editor/run/', views.run_scenario_data_api, name='editor-run'),
     path('editor/list/', views.list_scenarios_api, name='editor-list'),
     path('editor/reference/upload/', views.upload_reference_api, name='upload-reference'),
     path('editor/reference/', views.serve_reference_api, name='serve-reference'),

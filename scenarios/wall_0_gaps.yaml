@@ -88,5 +88,5 @@ triggers:
   action:
     type: move
     target:
-      x: 51
-      y: 33
+      x: 52
+      y: 28

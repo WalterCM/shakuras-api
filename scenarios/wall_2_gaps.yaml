@@ -5,8 +5,8 @@ entities:
 - id: scv1
   type: scv
   owner: p1
-  x: 10
-  y: 37
+  x: 20
+  y: 40
 - id: m1
   type: mineral_patch
   owner: neutral
@@ -103,5 +103,5 @@ triggers:
   action:
     type: move
     target:
-      x: 51
-      y: 29
+      x: 43
+      y: 23

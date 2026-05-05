@@ -585,10 +585,9 @@
                 ctx.beginPath();
                 let width = (entity.width || 1) * baseScale;
                 let height = (entity.height || 1) * baseScale;
-                let radius = entity.radius ? entity.radius * baseScale : 6;
-
-                // Render everything as rectangles now that we have width/height
-                ctx.roundRect(x - width / 2, y - height / 2, width, height, 2);
+                
+                // Pure rectangles for everyone
+                ctx.rect(x - width / 2, y - height / 2, width, height);
 
                 let baseColor = entity.owner_id === 'p1' ? '#3b82f6' : '#ef4444';
                 if (entity.owner_id === 'neutral') {
@@ -598,22 +597,16 @@
                 if (entity.type === 'marine') {
                     ctx.fillStyle = entity.owner_id === 'p1' ? '#00f2ff' : '#ff0055';
                     ctx.strokeStyle = '#ffffff';
-                    ctx.lineWidth = 2 / camera.scale;
-                    ctx.shadowColor = ctx.fillStyle;
-                    ctx.shadowBlur = 10 * camera.scale;
+                    ctx.lineWidth = 1 / camera.scale;
                 } else if (entity.type === 'scv') {
                     ctx.fillStyle = baseColor;
                     ctx.strokeStyle = entity.carrying > 0 ? '#fbbf24' : 'rgba(0,0,0,0.2)';
-                    ctx.lineWidth = (entity.carrying > 0 ? 3 : 1) / camera.scale;
-                    ctx.shadowBlur = 0;
+                    ctx.lineWidth = (entity.carrying > 0 ? 2 : 1) / camera.scale;
                 } else {
                     ctx.fillStyle = baseColor;
                     ctx.strokeStyle = 'rgba(0,0,0,0.2)';
                     ctx.lineWidth = 1 / camera.scale;
-                    ctx.shadowBlur = 0;
                 }
-
-                if (isFlashing) ctx.fillStyle = '#ffffff';
 
                 ctx.fill();
                 ctx.stroke();
@@ -621,9 +614,7 @@
                 if (entity.id === monitoredEntityId) {
                     ctx.strokeStyle = '#ffffff';
                     ctx.lineWidth = 2 / camera.scale;
-                    ctx.setLineDash([5, 5]);
-                    ctx.stroke();
-                    ctx.setLineDash([]);
+                    ctx.stroke(); // Solid stroke, like the editor
                 }
 
                 // Render Waypoints/Path

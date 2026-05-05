@@ -62,23 +62,19 @@
         .list-section-title { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.1em; margin: 12px 0 8px 0; }
         .item-card {
             background: rgba(15,23,42,0.5); border: 1px solid rgba(255,255,255,0.08);
-            padding: 10px 14px; border-radius: 10px;
+            padding: 12px 16px; border-radius: 12px;
             display: flex; justify-content: space-between; align-items: center;
-            transition: all 0.2s;
+            transition: all 0.2s; cursor: pointer;
         }
-        .item-card:hover { border-color: var(--accent); background: rgba(56,189,248,0.08); }
+        .item-card:hover { 
+            border-color: var(--accent); 
+            background: rgba(56,189,248,0.12); 
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
         .item-info { display: flex; flex-direction: column; gap: 2px; }
-        .item-name { font-weight: 600; font-size: 13px; }
-        .item-meta { font-size: 10px; color: var(--text-dim); }
-        
-        .badge {
-            padding: 4px 10px; border-radius: 6px; font-size: 10px; font-weight: 600; 
-            cursor: pointer; border: 1px solid rgba(255,255,255,0.1); transition: all 0.2s;
-        }
-        .badge.edit { background: rgba(255,255,255,0.05); color: white; }
-        .badge.edit:hover { background: var(--accent); color: var(--bg-dark); }
-        .badge.run { background: rgba(16,185,129,0.1); color: var(--success); border-color: rgba(16,185,129,0.2); }
-        .badge.run:hover { background: var(--success); color: white; }
+        .item-name { font-weight: 600; font-size: 14px; }
+        .item-meta { font-size: 11px; color: var(--text-dim); }
 
         /* ===== Editor Layout ===== */
         .editor-layout { display: flex; height: 100vh; visibility: hidden; }
@@ -148,6 +144,29 @@
 
         .toggle-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--text-main); }
         .toggle-row input { width: 16px; height: 16px; cursor: pointer; }
+
+        /* ===== Playback Bar ===== */
+        .playback-bar {
+            position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
+            background: rgba(15,23,42,0.9); border: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(12px); padding: 12px 24px; border-radius: 20px;
+            display: flex; align-items: center; gap: 20px; min-width: 500px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.6); z-index: 1000;
+        }
+        .playback-bar button {
+            background: var(--accent); color: var(--bg-dark); border: none;
+            width: 36px; height: 36px; border-radius: 50%; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; font-size: 16px; transition: all 0.2s;
+        }
+        .playback-bar button:hover { transform: scale(1.1); filter: brightness(1.1); }
+        .playback-bar input[type="range"] {
+            flex: 1; accent-color: var(--accent); cursor: pointer; height: 4px;
+        }
+        .playback-bar span { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-main); min-width: 80px; text-align: center; }
+        .playback-bar select {
+            background: rgba(255,255,255,0.05); color: white; border: 1px solid rgba(255,255,255,0.1);
+            padding: 6px 12px; border-radius: 8px; font-size: 11px; outline: none; cursor: pointer;
+        }
 
         .btn-group { display: flex; flex-direction: column; gap: 8px; margin-top: auto; }
         .primary-btn {
@@ -226,57 +245,74 @@
                 <button id="btn-delete" class="sys-btn delete" onclick="setTool('delete')"><span>×</span> Delete</button>
             </div>
         </div>
+        <div id="sidebar-design">
+            <div class="control-group">
+                <label>Palette</label>
+                <div class="owner-selector">
+                    <button id="owner-p1" class="owner-btn p1 active" onclick="setOwner('p1')">P1</button>
+                    <button id="owner-p2" class="owner-btn p2" onclick="setOwner('p2')">P2</button>
+                    <button id="owner-neutral" class="owner-btn neutral" onclick="setOwner('neutral')">NEUTRAL</button>
+                </div>
+                
+                <div class="category-tabs">
+                    <button class="cat-tab active" onclick="setCategory('neutral')">NEUTRAL</button>
+                    <button class="cat-tab" onclick="setCategory('terran')">TERRAN</button>
+                    <button class="cat-tab" onclick="setCategory('protoss')">PROTOSS</button>
+                    <button class="cat-tab" onclick="setCategory('zerg')">ZERG</button>
+                </div>
 
-        <div class="control-group">
-            <label>Palette</label>
-            <div class="owner-selector">
-                <button id="owner-p1" class="owner-btn p1 active" onclick="setOwner('p1')">P1</button>
-                <button id="owner-p2" class="owner-btn p2" onclick="setOwner('p2')">P2</button>
-                <button id="owner-neutral" class="owner-btn neutral" onclick="setOwner('NEUTRAL')">NEUTRAL</button>
-            </div>
-            
-            <div class="category-tabs">
-                <button class="cat-tab active" onclick="setCategory('neutral')">NEUTRAL</button>
-                <button class="cat-tab" onclick="setCategory('terran')">TERRAN</button>
-                <button class="cat-tab" onclick="setCategory('protoss')">PROTOSS</button>
-                <button class="cat-tab" onclick="setCategory('zerg')">ZERG</button>
+                <div id="unit-palette" class="palette-grid"></div>
             </div>
 
-            <div id="unit-palette" class="palette-grid"></div>
+            <div class="control-group">
+                <label>Options</label>
+                <div class="toggle-row">
+                    <span>Snap to Grid</span>
+                    <input type="checkbox" id="snap-grid" checked>
+                </div>
+                <div class="toggle-row">
+                    <span>Show Collisions (C)</span>
+                    <input type="checkbox" id="show-collisions">
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>Entity Inspector</label>
+                <div id="inspector" class="inspector">
+                    <div id="ins-name" style="font-weight: 600; color: var(--accent); margin-bottom: 8px;">No Selection</div>
+                    <div id="ins-orders" style="display: flex; flex-direction: column; gap: 4px;"></div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>Reference Image</label>
+                <div id="ref-status" style="font-size: 10px; color: var(--accent); margin-bottom: 4px; font-weight: 600;">No image loaded</div>
+                <input type="file" id="ref-input" accept="image/*" style="font-size: 10px;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+                    <label style="font-size: 10px; color: var(--text-dim);">Opacity</label>
+                    <input type="range" id="ref-opacity" min="0" max="1" step="0.1" value="0.3" style="flex: 1;">
+                </div>
+            </div>
         </div>
 
-        <div class="control-group">
-            <label>Options</label>
-            <div class="toggle-row">
-                <span>Snap to Grid</span>
-                <input type="checkbox" id="snap-grid" checked>
+        <div id="sidebar-simulate" style="display: none;">
+            <div class="control-group">
+                <label>Resources</label>
+                <div id="resource-panel" style="display: flex; flex-direction: column; gap: 8px;">
+                    <!-- Will be populated by JS -->
+                </div>
             </div>
-            <div class="toggle-row">
-                <span>Show Collisions (C)</span>
-                <input type="checkbox" id="show-collisions">
-            </div>
-        </div>
-
-        <div class="control-group">
-            <label>Inspector</label>
-            <div id="inspector" class="inspector">
-                <div id="ins-name" style="color: var(--accent); font-weight: bold; margin-bottom: 5px; font-size: 14px;">No Selection</div>
-                <div id="ins-orders"></div>
-            </div>
-        </div>
-
-        <div class="control-group" style="border-top: 1px solid rgba(255,255,255,0.05); padding-top: 10px;">
-            <label>Reference</label>
-            <div id="ref-status" style="font-size: 10px; color: var(--accent); margin-bottom: 4px; font-weight: 600;">No image loaded</div>
-            <input type="file" id="ref-input" accept="image/*" style="font-size: 10px;">
-            <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
-                <label style="font-size: 10px; color: var(--text-dim);">Opacity</label>
-                <input type="range" id="ref-opacity" min="0" max="1" step="0.1" value="0.3" style="flex: 1;">
+            <div class="control-group" style="flex: 1; display: flex; flex-direction: column;">
+                <label>Action Log</label>
+                <div id="delta-log" style="flex: 1; background: rgba(15,23,42,0.4); border-radius: 12px; padding: 12px; font-size: 11px; overflow-y: auto; font-family: 'JetBrains Mono', monospace;">
+                    <!-- Will be populated by JS -->
+                </div>
             </div>
         </div>
 
         <div class="btn-group">
-            <button id="run-btn" class="run-btn" onclick="save(true)">▶ Test Scenario</button>
+            <button id="run-btn" class="run-btn" onclick="runSimulation()">▶ Run Simulation</button>
+            <button id="stop-btn" class="primary-btn" onclick="stopSimulation()" style="display: none; background: var(--danger);">■ Stop Simulation</button>
             <button id="save-btn" class="primary-btn" onclick="save(false)">Save Changes</button>
         </div>
     </div>
@@ -288,6 +324,18 @@
             <span>ZOOM: <b id="ui-zoom" style="color: var(--accent);">4.0x</b></span>
             <span>MODE: <b id="ui-mode" style="color: var(--accent);">SELECT</b></span>
         </div>
+        
+        <div id="playback-bar" class="playback-bar" style="display: none;">
+            <button onclick="togglePlay()" id="play-pause-btn">▶</button>
+            <input type="range" id="timeline" min="0" max="0" value="0" oninput="seek(parseInt(this.value))">
+            <span id="timer">0/0</span>
+            <select onchange="playbackSpeed = parseFloat(this.value)">
+                <option value="0.5">0.5x</option>
+                <option value="1" selected>1.0x</option>
+                <option value="2">2.0x</option>
+                <option value="4">4.0x</option>
+            </select>
+        </div>
     </div>
 </div>
 
@@ -298,7 +346,18 @@
     const canvas = document.getElementById('editor-canvas');
     const ctx = canvas.getContext('2d');
     
-    let entities = [], triggers = [], selectedIds = [], currentTool = 'cursor', currentOwner = 'p1', currentCategory = 'neutral';
+    let entities = [];
+    let triggers = [];
+    let selectedIds = [];
+    
+    // Simulation state
+    let isPlaying = false;
+    let currentTick = 0;
+    let replayData = null;
+    let navGrid = null;
+    let playbackSpeed = 1;
+    let lastFrameTime = 0;
+    let currentTool = 'cursor', currentOwner = 'p1', currentCategory = 'neutral';
     let scale = 4, offsetX = 0, offsetY = 0, isPanning = false, lastMousePos = { x: 0, y: 0 };
     let mapW = 128, mapH = 128, currentPath = null;
     let mouseWorldPos = { x: 0, y: 0 };
@@ -385,7 +444,74 @@
         return { x: (sx - r.left - canvas.width/2 - offsetX) / scale, y: (sy - r.top - canvas.height/2 - offsetY) / scale };
     }
 
-    function draw() {
+    function renderEntity(type, owner, x, y, isSelected = false, isSimulation = false) {
+        const d = UNIT_DEFS[type] || { width: 1, height: 1 };
+        const w = d.width;
+        const h = d.height;
+        
+        // Convert simulation center coords to top-left if needed
+        const drawX = isSimulation ? x - w / 2 : x;
+        const drawY = isSimulation ? y - h / 2 : y;
+        
+        ctx.fillStyle = owner === 'p1' ? '#3b82f6' : (owner === 'p2' ? '#ef4444' : '#eab308');
+        if (type === 'mineral_patch') ctx.fillStyle = '#00f2ff';
+        
+        ctx.globalAlpha = 0.7;
+        ctx.fillRect(drawX, drawY, w, h);
+        ctx.globalAlpha = 1.0;
+        
+        if (isSelected) {
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2 / scale;
+            ctx.strokeRect(drawX, drawY, w, h);
+        }
+        
+        if (showCollisionsCache) {
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 1 / scale;
+            ctx.strokeRect(drawX + 0.1, drawY + 0.1, w - 0.2, h - 0.2);
+        }
+    }
+
+    let showCollisionsCache = false;
+    document.getElementById('show-collisions').addEventListener('change', (e) => { showCollisionsCache = e.target.checked; });
+
+    function getVisibleEntities() {
+        if (isPlaying && replayData && replayData[currentTick]) {
+            return replayData[currentTick].entities;
+        }
+        return entities;
+    }
+
+    function getEntityRect(ent) {
+        const d = UNIT_DEFS[ent.type] || { width: 1, height: 1 };
+        const isSimulation = ent.owner_id !== undefined;
+        const x = isSimulation ? ent.x - d.width/2 : ent.x;
+        const y = isSimulation ? ent.y - d.height/2 : ent.y;
+        return { x, y, w: d.width, h: d.height };
+    }
+
+    function draw(timestamp) {
+        if (!canvas.width) return;
+        
+        // Advance simulation tick
+        if (isPlaying && replayData) {
+            const elapsed = timestamp - lastFrameTime;
+            const nextFrameDelay = 100 / playbackSpeed; // 10 ticks per second at 1.0 speed
+            
+            if (elapsed >= nextFrameDelay) {
+                currentTick++;
+                if (currentTick >= replayData.length) {
+                    currentTick = replayData.length - 1;
+                    isPlaying = false;
+                }
+                lastFrameTime = timestamp;
+                updatePlaybackUI();
+            }
+        } else {
+            lastFrameTime = timestamp;
+        }
+
         ctx.setTransform(1,0,0,1,0,0);
         ctx.fillStyle = '#020617'; ctx.fillRect(0,0,canvas.width,canvas.height);
         ctx.translate(canvas.width/2 + offsetX, canvas.height/2 + offsetY);
@@ -413,22 +539,29 @@
         for(let i=0; i<=mapW; i+=8) { ctx.moveTo(i,0); ctx.lineTo(i,mapH); }
         for(let i=0; i<=mapH; i+=8) { ctx.moveTo(0,i); ctx.lineTo(mapW,i); }
         ctx.stroke();
-
-        const showCollisions = document.getElementById('show-collisions').checked;
-
-        entities.forEach(e => {
-            const d = UNIT_DEFS[e.type];
-            ctx.fillStyle = e.owner === 'p1' ? '#3b82f6' : (e.owner === 'p2' ? '#ef4444' : '#eab308');
-            if (e.type === 'mineral_patch') ctx.fillStyle = '#00f2ff';
-            ctx.globalAlpha = 0.7; ctx.fillRect(e.x, e.y, d.width, d.height);
-            ctx.globalAlpha = 1.0;
-            if (selectedIds.includes(e.id)) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 2/scale; ctx.strokeRect(e.x, e.y, d.width, d.height); }
-            
-            if (showCollisions) {
-                ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 1/scale;
-                ctx.strokeRect(e.x + 0.1, e.y + 0.1, d.width - 0.2, d.height - 0.2);
+        
+        // Draw Nav Grid (Static Collisions)
+        if (document.getElementById('show-collisions').checked && navGrid) {
+            ctx.fillStyle = 'rgba(239, 68, 68, 0.4)'; // Red-500
+            for (let x = 0; x < navGrid.length; x++) {
+                for (let y = 0; y < navGrid[x].length; y++) {
+                    if (navGrid[x][y]) {
+                        ctx.fillRect(x, y, 1, 1);
+                    }
+                }
             }
-        });
+        }
+
+        if (replayData && replayData[currentTick]) {
+            const frame = replayData[currentTick];
+            frame.entities.forEach(e => {
+                renderEntity(e.type, e.owner_id, e.x, e.y, selectedIds.includes(e.id), true);
+            });
+        } else {
+            entities.forEach(e => {
+                renderEntity(e.type, e.owner, e.x, e.y, selectedIds.includes(e.id), false);
+            });
+        }
 
         // Ghost Placement
         if (currentTool !== 'cursor' && currentTool !== 'delete' && !isPanning) {
@@ -468,8 +601,8 @@
                 // Draw Waypoint Handle
                 ctx.fillStyle = selectedIds.includes(`wp_${t.entity}`) ? '#fff' : '#10b981';
                 ctx.beginPath(); ctx.arc(t.action.target.x, t.action.target.y, 0.3, 0, Math.PI*2); ctx.fill();
-            } else if (t.action.target_id) { 
-                const tar = entities.find(ent => ent.id === t.action.target_id); 
+            } else if (t.action.target && t.action.target.id) { 
+                const tar = entities.find(ent => ent.id === t.action.target.id); 
                 if (tar) {
                     const td = UNIT_DEFS[tar.type];
                     ctx.lineTo(tar.x + td.width/2, tar.y + td.height/2);
@@ -478,8 +611,6 @@
             }
             ctx.setLineDash([]);
         });
-
-        requestAnimationFrame(draw);
     }
 
     canvas.addEventListener('mousedown', (e) => {
@@ -493,16 +624,21 @@
             if (selectedIds.length > 0) {
                 // Assign orders to all selected
                 const firstId = selectedIds[0];
-                const ent = entities.find(ent => ent.id === firstId);
+                const currentVisible = getVisibleEntities();
+                const ent = currentVisible.find(ent => ent.id === firstId);
                 if (!ent || ent.owner === 'neutral') return;
                 
-                let tar = entities.find(ent => { const d = UNIT_DEFS[ent.type]; return w.x >= ent.x && w.x <= ent.x + d.width && w.y >= ent.y && w.y <= ent.y + d.height; });
+                let tar = currentVisible.find(ent => { 
+                    const r = getEntityRect(ent);
+                    return w.x >= r.x && w.x <= r.x + r.w && w.y >= r.y && w.y <= r.y + r.h; 
+                });
                 
                 selectedIds.forEach(id => {
-                    const e = entities.find(e => e.id === id);
-                    if (!e || e.owner === 'neutral') return;
+                    const e = entities.find(e => e.id === id); // We still update the instructions (triggers)
+                    const owner = e ? e.owner : (entities.find(en => en.id === id)?.owner);
+                    if (!e || (e.owner || e.owner_id) === 'neutral') return;
                     triggers = triggers.filter(t => !(t.entity === id && t.tick === 0));
-                    if (tar) triggers.push({ tick: 0, entity: id, action: { type: tar.type === 'mineral_patch' ? 'gather' : (tar.owner !== e.owner ? 'attack' : 'move'), target_id: tar.id } });
+                    if (tar) triggers.push({ tick: 0, entity: id, action: { type: tar.type === 'mineral_patch' ? 'gather' : (tar.owner !== e.owner ? 'attack' : 'move'), target: { id: tar.id } } });
                     else triggers.push({ tick: 0, entity: id, action: { type: 'move', target: { x: w.x, y: w.y } } });
                 });
                 
@@ -523,7 +659,8 @@
                             const trig = triggers.find(t => t.entity === eid && t.tick === 0);
                             if (trig && trig.action.target) dragOffsets[id] = { x: w.x - trig.action.target.x, y: w.y - trig.action.target.y };
                         } else {
-                            const ent = entities.find(e => e.id === id);
+                            const currentVisible = getVisibleEntities();
+                            const ent = currentVisible.find(e => e.id === id);
                             if (ent) dragOffsets[id] = { x: w.x - ent.x, y: w.y - ent.y };
                         }
                     });
@@ -541,7 +678,10 @@
                     updateInspector(); updateUI(); return;
                 }
 
-                let clicked = entities.find(ent => { const d = UNIT_DEFS[ent.type]; return w.x >= ent.x && w.x <= ent.x + d.width && w.y >= ent.y && w.y <= ent.y + d.height; });
+                let clicked = getVisibleEntities().find(ent => { 
+                    const r = getEntityRect(ent);
+                    return w.x >= r.x && w.x <= r.x + r.w && w.y >= r.y && w.y <= r.y + r.h; 
+                });
                 if (clicked) {
                     if (!selectedIds.includes(clicked.id)) {
                         if (!e.ctrlKey) selectedIds = [clicked.id];
@@ -612,16 +752,19 @@
 
     window.addEventListener('mouseup', () => {
         if (isSelecting) {
-            const xmin = Math.min(selectionStart.x, mouseWorldPos.x), xmax = Math.max(selectionStart.x, mouseWorldPos.x);
-            const ymin = Math.min(selectionStart.y, mouseWorldPos.y), ymax = Math.max(selectionStart.y, mouseWorldPos.y);
-            entities.forEach(ent => {
-                const d = UNIT_DEFS[ent.type], ex = ent.x + d.width/2, ey = ent.y + d.height/2;
-                if (ex >= xmin && ex <= xmax && ey >= ymin && ey <= ymax) { if (!selectedIds.includes(ent.id)) selectedIds.push(ent.id); }
+            const currentVisible = getVisibleEntities();
+            const x1 = Math.min(selectionStart.x, mouseWorldPos.x), x2 = Math.max(selectionStart.x, mouseWorldPos.x);
+            const y1 = Math.min(selectionStart.y, mouseWorldPos.y), y2 = Math.max(selectionStart.y, mouseWorldPos.y);
+            currentVisible.forEach(ent => {
+                const r = getEntityRect(ent);
+                if (r.x >= x1 && r.x + r.w <= x2 && r.y >= y1 && r.y + r.h <= y2) {
+                    if (!selectedIds.includes(ent.id)) selectedIds.push(ent.id);
+                }
             });
             // Also select waypoints
             triggers.forEach(t => {
                 if (t.action.target) {
-                    if (t.action.target.x >= xmin && t.action.target.x <= xmax && t.action.target.y >= ymin && t.action.target.y <= ymax) {
+                    if (t.action.target.x >= x1 && t.action.target.x <= x2 && t.action.target.y >= y1 && t.action.target.y <= y2) {
                         const wpId = `wp_${t.entity}`;
                         if (!selectedIds.includes(wpId)) selectedIds.push(wpId);
                     }
@@ -653,6 +796,13 @@
                 saveState(); updateInspector();
             }
         }
+        
+        // Simulation playback controls
+        if (replayData) {
+            if (e.code === 'ArrowRight') { e.preventDefault(); seek(Math.min(replayData.length - 1, currentTick + 1)); }
+            if (e.code === 'ArrowLeft') { e.preventDefault(); seek(Math.max(0, currentTick - 1)); }
+            if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
+        }
     });
 
     function updateInspector() {
@@ -682,8 +832,8 @@
             const res = await fetch('/matches/editor/list/'); const data = await res.json();
             const maps = data.scenarios.filter(s => s.category === 'map');
             const scens = data.scenarios.filter(s => s.category === 'scenario');
-            document.getElementById('map-list').innerHTML = maps.map(s => `<div class="item-card"><div class="item-info"><span class="item-name">${s.name || 'Unnamed'}</span><span class="item-meta">${s.width}x${s.height}</span></div><button class="badge edit" onclick="openFile('${s.path}')">Edit</button></div>`).join('') || '<div style="font-size:10px; color:var(--text-dim); padding:10px;">No maps found</div>';
-            document.getElementById('scenario-list').innerHTML = scens.map(s => `<div class="item-card"><div class="item-info"><span class="item-name">${s.name || 'Unnamed'}</span><span class="item-meta">${s.width}x${s.height}</span></div><div style="display:flex; gap:4px;"><button class="badge edit" onclick="openFile('${s.path}')">Edit</button><button class="badge run" onclick="window.location.href='/matches/scenarios/?path=${s.path}'">Run</button></div></div>`).join('') || '<div style="font-size:10px; color:var(--text-dim); padding:10px;">No scenarios found</div>';
+            document.getElementById('map-list').innerHTML = maps.map(s => `<div class="item-card" onclick="openFile('${s.path}')"><div class="item-info"><span class="item-name">${s.name || 'Unnamed'}</span><span class="item-meta">${s.width}x${s.height}</span></div><span style="font-size: 14px; opacity: 0.3;">→</span></div>`).join('') || '<div style="font-size:10px; color:var(--text-dim); padding:10px;">No maps found</div>';
+            document.getElementById('scenario-list').innerHTML = scens.map(s => `<div class="item-card" onclick="openFile('${s.path}')"><div class="item-info"><span class="item-name">${s.name || 'Unnamed'}</span><span class="item-meta">${s.width}x${s.height}</span></div><span style="font-size: 14px; opacity: 0.3;">→</span></div>`).join('') || '<div style="font-size:10px; color:var(--text-dim); padding:10px;">No scenarios found</div>';
         } catch (err) { console.error("Error refreshing list:", err); }
     }
 
@@ -750,10 +900,109 @@
             const res = await fetch('/matches/editor/save/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) });
             const r = await res.json();
             if (r.status === 'ok') { 
-                currentPath = r.path; if (run) window.location.href = `/matches/scenarios/?path=${r.path}`; 
+                currentPath = r.path; 
+                if (run) runSimulation(); 
                 else { saveBtn.innerText = 'Saved! ✓'; setTimeout(() => { saveBtn.innerText = originalText; saveBtn.disabled = false; }, 2000); }
             } else throw new Error(r.message || 'Unknown error');
         } catch (err) { alert('Save failed: ' + err.message); saveBtn.innerText = originalText; saveBtn.disabled = false; }
+    }
+
+    async function runSimulation() {
+        const runBtn = document.getElementById('run-btn');
+        runBtn.disabled = true; runBtn.innerText = 'Simulating...';
+        const p = { name: document.getElementById('file-name').value, width: mapW, height: mapH, entities, triggers };
+        try {
+            const res = await fetch('/matches/editor/run/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) });
+            const r = await res.json();
+            if (r.status === 'ok') {
+                replayData = processReplay(r.history); 
+                navGrid = r.static_grid; // Store the nav grid
+                isPlaying = true; currentTick = 0;
+                lastFrameTime = performance.now();
+                document.getElementById('sidebar-design').style.display = 'none';
+                document.getElementById('sidebar-simulate').style.display = 'flex';
+                document.getElementById('playback-bar').style.display = 'flex';
+                document.getElementById('run-btn').style.display = 'none';
+                document.getElementById('stop-btn').style.display = 'block';
+                const timeline = document.getElementById('timeline');
+                timeline.max = Math.max(0, replayData.length - 1); timeline.value = 0;
+                updatePlaybackUI();
+            } else throw new Error(r.message || 'Simulation failed');
+        } catch (err) { alert('Simulation failed: ' + err.message); }
+        finally { runBtn.disabled = false; runBtn.innerText = '▶ Run Simulation'; }
+    }
+
+    function processReplay(deltas) {
+        let frames = [];
+        // Deep copy initial state to avoid mutating the editor's global entities
+        let currentEntities = JSON.parse(JSON.stringify(entities)).map(e => {
+            const d = UNIT_DEFS[e.type] || { width: 1, height: 1 };
+            return { ...e, owner_id: e.owner, x: e.x + d.width/2, y: e.y + d.height/2 };
+        });
+        let currentResources = { p1: 50, p2: 50 };
+        
+        // Frame 0
+        frames.push({ entities: JSON.parse(JSON.stringify(currentEntities)), resources: { ...currentResources } });
+        
+        let maxTick = deltas.length > 0 ? deltas[deltas.length - 1].tick : 0;
+        let deltaIdx = 0;
+        
+        for (let t = 1; t <= maxTick; t++) {
+            // Apply all deltas up to and including this tick
+            while (deltaIdx < deltas.length && deltas[deltaIdx].tick <= t) {
+                const d = deltas[deltaIdx];
+                if (d.entities) {
+                    d.entities.forEach(entDelta => {
+                        let ent = currentEntities.find(e => e.id === entDelta.id);
+                        if (ent) Object.assign(ent, entDelta);
+                        else currentEntities.push({ ...JSON.parse(JSON.stringify(entDelta)) });
+                    });
+                }
+                if (d.resources) Object.assign(currentResources, d.resources);
+                deltaIdx++;
+            }
+            
+            frames.push(JSON.parse(JSON.stringify({ 
+                entities: currentEntities.filter(e => e.status !== 'dead'), 
+                resources: { ...currentResources } 
+            })));
+        }
+        return frames;
+    }
+
+    function stopSimulation() {
+        isPlaying = false; replayData = null; currentTick = 0;
+        document.getElementById('sidebar-design').style.display = 'block';
+        document.getElementById('sidebar-simulate').style.display = 'none';
+        document.getElementById('playback-bar').style.display = 'none';
+        document.getElementById('run-btn').style.display = 'block';
+        document.getElementById('stop-btn').style.display = 'none';
+        updateUI();
+    }
+
+    function togglePlay() {
+        isPlaying = !isPlaying;
+        document.getElementById('play-pause-btn').innerText = isPlaying ? '⏸' : '▶';
+    }
+
+    function seek(tick) {
+        currentTick = tick; isPlaying = false;
+        document.getElementById('play-pause-btn').innerText = '▶';
+        updatePlaybackUI();
+    }
+
+    function updatePlaybackUI() {
+        if (!replayData) return;
+        document.getElementById('timeline').value = currentTick;
+        document.getElementById('timer').innerText = `${currentTick}/${replayData.length - 1}`;
+        const frame = replayData[currentTick];
+        if (frame.resources) {
+            document.getElementById('resource-panel').innerHTML = Object.entries(frame.resources).map(([pid, val]) => `
+                <div style="display: flex; justify-content: space-between; font-size: 11px; background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 4px;">
+                    <span style="color: ${pid === 'p1' ? '#3b82f6' : '#ef4444'}; font-weight: bold;">${pid.toUpperCase()}</span>
+                    <span>${Math.floor(val)}</span>
+                </div>`).join('');
+        }
     }
     function startNew(w,h) { 
         mapW=w; mapH=h; entities=[]; triggers=[]; saveState(); 
@@ -771,7 +1020,15 @@
     }
     function resize() { canvas.width = canvas.parentElement.clientWidth; canvas.height = canvas.parentElement.clientHeight; }
     window.onresize = resize; canvas.oncontextmenu = (e) => e.preventDefault();
-    initPalette(); refreshList(); resize(); draw();
+    function loop(t) {
+        draw(t);
+        requestAnimationFrame(loop);
+    }
+
+    initPalette(); 
+    refreshList(); 
+    resize(); 
+    requestAnimationFrame(loop);
 </script>
 </body>
 </html>
