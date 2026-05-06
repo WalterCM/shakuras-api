@@ -560,7 +560,7 @@
     document.getElementById('show-collisions').addEventListener('change', (e) => { showCollisionsCache = e.target.checked; });
 
     function getVisibleEntities() {
-        if (isPlaying && replayData && replayData[currentTick]) {
+        if (replayData && replayData[currentTick] && (currentTick > 0 || isPlaying)) {
             return replayData[currentTick].entities;
         }
         return entities;
@@ -736,12 +736,15 @@
             
             // DRAW FULL FUTURE TRAJECTORY FROM REPLAY (Segmented by phase)
             let fullPath = [];
-            if (replayData) {
+            if (replayData && !isDirty) {
                 const currentSnap = replayData[currentTick] ? replayData[currentTick].entities.find(ent => ent.id === t.entity) : null;
                 const currentPhase = (currentSnap && currentSnap.action_details) ? currentSnap.action_details.phase : null;
 
                 // Look ahead from currentTick
                 for (let i = currentTick; i < replayData.length; i++) {
+                    // STOP if a NEW trigger occurs for this entity at this future tick
+                    if (i > currentTick && triggers.some(trig => trig.entity === t.entity && trig.tick === i)) break;
+
                     const snap = replayData[i].entities.find(ent => ent.id === t.entity);
                     if (snap) {
                         // STOP if the phase changes (e.g. from moving to mining, or mining to returning)
@@ -755,15 +758,22 @@
                 }
             }
 
-                if (fullPath.length > 0) {
-                    ctx.beginPath();
-                    ctx.strokeStyle = 'rgba(56,189,248,0.5)'; // Fainter for the "planned" trail
-                    ctx.moveTo(fullPath[0].x, fullPath[0].y);
-                    for (let i = 1; i < fullPath.length; i++) {
-                        ctx.lineTo(fullPath[i].x, fullPath[i].y);
-                    }
-                    ctx.stroke();
+            ctx.beginPath();
+            if (fullPath.length > 0) {
+                ctx.strokeStyle = 'rgba(56,189,248,0.5)'; // Fainter for the "planned" trail
+                ctx.moveTo(fullPath[0].x, fullPath[0].y);
+                for (let i = 1; i < fullPath.length; i++) {
+                    ctx.lineTo(fullPath[i].x, fullPath[i].y);
                 }
+                ctx.stroke();
+                // Move to the end of the calculated path to continue with the target line
+                ctx.beginPath();
+                ctx.moveTo(fullPath[fullPath.length-1].x, fullPath[fullPath.length-1].y);
+            } else {
+                // If no calculated path (dirty or just starting), start from the current unit position
+                ctx.moveTo(curX, curY);
+            }
+            ctx.strokeStyle = '#38bdf8';
 
             let targetX = null, targetY = null;
             let edgeX = null, edgeY = null;
@@ -809,9 +819,9 @@
                 ctx.lineTo(finalX, finalY);
                 ctx.stroke();
                 
-                // Draw Waypoint Handle
-                ctx.fillStyle = selectedIds.includes(`wp_${t.entity}`) ? '#fff' : '#38bdf8';
-                ctx.beginPath(); ctx.arc(finalX, finalY, 0.4, 0, Math.PI*2); ctx.fill();
+                // Draw Waypoint Marker (Not a handle anymore)
+                ctx.fillStyle = '#38bdf8';
+                ctx.beginPath(); ctx.arc(finalX, finalY, 0.3, 0, Math.PI*2); ctx.fill();
             }
             ctx.setLineDash([]);
         });
@@ -900,23 +910,9 @@
 
         if (e.button === 0) {
             // Left-click logic
-            if (currentTick > 0) {
-                // In simulation playback, left-click only selects, no dragging/placing
-                let clicked = getVisibleEntities().find(ent => { 
-                    const r = getEntityRect(ent);
-                    return w.x >= r.x && w.x <= r.x + r.w && w.y >= r.y && w.y <= r.y + r.h; 
-                });
-                if (clicked) {
-                    if (!selectedIds.includes(clicked.id)) {
-                        if (!e.ctrlKey) selectedIds = [clicked.id];
-                        else selectedIds.push(clicked.id);
-                    }
-                } else if (!e.ctrlKey) {
-                    selectedIds = [];
-                }
-                updateInspector();
-                return;
-            }
+            // Allow selection and tool usage at any tick. 
+            // Dragging is only allowed at Tick 0 to keep the initial state stable.
+            const isAtStart = currentTick === 0 && !isPlaying;
 
             if (currentTool === 'cursor') {
                 // Common logic for dragging either a waypoint or an entity
@@ -936,18 +932,8 @@
                     });
                 };
 
-                let clickedWP = triggers.find(t => t.action.target && Math.hypot(t.action.target.x - w.x, t.action.target.y - w.y) < 0.5);
-                if (clickedWP) {
-                    const wpId = `wp_${clickedWP.entity}`;
-                    if (!selectedIds.includes(wpId)) {
-                        if (!e.ctrlKey) selectedIds = [wpId];
-                        else selectedIds.push(wpId);
-                    }
-                    draggedWaypoint = clickedWP.entity;
-                    startDrag();
-                    updateInspector(); updateUI(); return;
-                }
-
+                // Removed Waypoint clicking/dragging logic as targets are now stable actions.
+                
                 let clicked = getVisibleEntities().find(ent => { 
                     const r = getEntityRect(ent);
                     return w.x >= r.x && w.x <= r.x + r.w && w.y >= r.y && w.y <= r.y + r.h; 
@@ -957,8 +943,10 @@
                         if (!e.ctrlKey) selectedIds = [clicked.id];
                         else selectedIds.push(clicked.id);
                     }
-                    draggedId = clicked.id;
-                    startDrag();
+                    if (isAtStart) {
+                        draggedId = clicked.id;
+                        startDrag();
+                    }
                 } else {
                     isSelecting = true;
                     selectionStart = { x: w.x, y: w.y };
@@ -1009,27 +997,16 @@
 
             selectedIds.forEach(id => {
                 const snap = document.getElementById('snap-grid').checked;
-                if (id.startsWith('wp_')) {
-                    const eid = id.replace('wp_', '');
-                    const trig = triggers.find(t => t.entity === eid && t.tick === 0);
-                    if (trig && trig.action.target && dragOffsets[id]) {
-                        const targetX = world.x - dragOffsets[id].x;
-                        const targetY = world.y - dragOffsets[id].y;
-                        trig.action.target.x = snap ? Math.round(targetX) : targetX;
-                        trig.action.target.y = snap ? Math.round(targetY) : targetY;
+                const ent = entities.find(e => e.id === id);
+                if (ent && dragOffsets[id]) {
+                    const d = UNIT_DEFS[ent.type];
+                    let nx = world.x - dragOffsets[id].x;
+                    let ny = world.y - dragOffsets[id].y;
+                    if (snap) {
+                        const snapped = getSnappedPos(nx, ny, d.width, d.height);
+                        nx = snapped.x; ny = snapped.y;
                     }
-                } else {
-                    const ent = entities.find(e => e.id === id);
-                    if (ent && dragOffsets[id]) {
-                        const d = UNIT_DEFS[ent.type];
-                        let nx = world.x - dragOffsets[id].x;
-                        let ny = world.y - dragOffsets[id].y;
-                        if (snap) {
-                            const snapped = getSnappedPos(nx, ny, d.width, d.height);
-                            nx = snapped.x; ny = snapped.y;
-                        }
-                        ent.x = nx; ent.y = ny;
-                    }
+                    ent.x = nx; ent.y = ny;
                 }
             });
         } else if (isSelecting) {
@@ -1050,15 +1027,7 @@
                     if (!selectedIds.includes(ent.id)) selectedIds.push(ent.id);
                 }
             });
-            // Also select waypoints
-            triggers.forEach(t => {
-                if (t.action.target) {
-                    if (t.action.target.x >= x1 && t.action.target.x <= x2 && t.action.target.y >= y1 && t.action.target.y <= y2) {
-                        const wpId = `wp_${t.entity}`;
-                        if (!selectedIds.includes(wpId)) selectedIds.push(wpId);
-                    }
-                }
-            });
+            // Removed waypoint area selection
             isSelecting = false; updateInspector();
         }
         if (isDragging) { saveState(); isDragging = false; draggedId = null; draggedWaypoint = null; }
