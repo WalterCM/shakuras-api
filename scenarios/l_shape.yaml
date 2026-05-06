@@ -1,92 +1,94 @@
+version: 1.1
 name: L-shape corner
 width: 64
 height: 64
+spawn_points: {}
 entities:
 - id: scv1
   type: scv
   owner: p1
-  x: 29
-  y: 29
+  x: 30
+  y: 32
 - id: m1
   type: mineral_patch
   owner: neutral
-  x: 35
-  y: 27
+  x: 36
+  y: 27.5
 - id: m2
   type: mineral_patch
   owner: neutral
-  x: 35
-  y: 28
+  x: 36
+  y: 28.5
 - id: m3
   type: mineral_patch
   owner: neutral
-  x: 35
-  y: 29
+  x: 36
+  y: 29.5
 - id: m4
   type: mineral_patch
   owner: neutral
-  x: 35
-  y: 30
+  x: 36
+  y: 30.5
 - id: m5
   type: mineral_patch
   owner: neutral
-  x: 35
-  y: 31
+  x: 36
+  y: 31.5
 - id: m6
   type: mineral_patch
   owner: neutral
-  x: 35
-  y: 32
+  x: 36
+  y: 32.5
 - id: m7
   type: mineral_patch
   owner: neutral
-  x: 35
-  y: 33
+  x: 36
+  y: 33.5
 - id: m8
   type: mineral_patch
   owner: neutral
-  x: 35
-  y: 34
+  x: 36
+  y: 34.5
 - id: m9
   type: mineral_patch
   owner: neutral
-  x: 35
-  y: 35
+  x: 36
+  y: 35.5
 - id: m10
   type: mineral_patch
   owner: neutral
-  x: 35
-  y: 36
+  x: 36
+  y: 36.5
 - id: m20
   type: mineral_patch
   owner: neutral
-  x: 34
-  y: 37
+  x: 35
+  y: 37.5
 - id: mineral_patch_1777934814300
   type: mineral_patch
   owner: neutral
-  x: 32
-  y: 37
+  x: 33
+  y: 37.5
 - id: mineral_patch_1777934815241
   type: mineral_patch
   owner: neutral
-  x: 30
-  y: 37
+  x: 31
+  y: 37.5
 - id: mineral_patch_1777934816415
   type: mineral_patch
   owner: neutral
-  x: 28
-  y: 37
+  x: 29
+  y: 37.5
 - id: mineral_patch_1777934817457
   type: mineral_patch
   owner: neutral
-  x: 26
-  y: 37
+  x: 27
+  y: 37.5
 - id: mineral_patch_1777934818213
   type: mineral_patch
   owner: neutral
-  x: 24
-  y: 37
+  x: 25
+  y: 37.5
 triggers:
 - tick: 0
   entity: scv1
@@ -95,3 +97,10 @@ triggers:
     target:
       x: 42
       y: 41
+- tick: 136
+  entity: scv1
+  action:
+    type: move
+    target:
+      x: 27.992837527360916
+      y: 31.913434984594048

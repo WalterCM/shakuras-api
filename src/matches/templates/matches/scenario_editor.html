@@ -197,6 +197,15 @@
             color: var(--text-main); border: 1px solid rgba(255,255,255,0.15);
             display: flex; gap: 24px; pointer-events: none;
         }
+        .toast {
+            position: absolute; top: 20px; left: 50%; transform: translateX(-50%) translateY(-20px);
+            background: var(--accent); color: var(--bg-dark); padding: 10px 24px;
+            border-radius: 30px; font-weight: 600; font-size: 13px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4); z-index: 2000;
+            opacity: 0; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            pointer-events: none;
+        }
+        .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
     </style>
 </head>
 <body>
@@ -223,6 +232,9 @@
         </div>
     </div>
 </div>
+
+<!-- ===== TOAST ===== -->
+<div id="toast" class="toast">Simulation updated</div>
 
 <!-- ===== EDITOR SCREEN ===== -->
 <div id="screen-editor" class="editor-layout">
@@ -350,8 +362,12 @@
     
     // Simulation state
     let isPlaying = false, currentTick = 0, lastFrameTime = 0, replayData = null;
-    let isSimulating = false; // NEW: track simulation state
-    let playRequestedWhileSimulating = false; // NEW: auto-play after load
+    let isSimulating = false; // Still true while a fetch is active
+    let isDirty = false;      // True when local changes haven't been simulated yet
+    let playRequestedWhileSimulating = false; 
+    let simDebounceTimer = null;
+    let dragStartPos = null;  // For drag threshold
+    let hasMovedEnough = false;
     let navGrid = null;
     let playbackSpeed = 1;
     let currentTool = 'cursor', currentOwner = 'p1', currentCategory = 'neutral';
@@ -370,6 +386,7 @@
         undoStack.push(JSON.stringify({ entities, triggers }));
         if (undoStack.length > 50) undoStack.shift();
         redoStack = [];
+        isDirty = true;
         autoSimulate();
     }
     
@@ -377,7 +394,7 @@
     function autoSimulate() {
         if (simTimeout) clearTimeout(simTimeout);
         simTimeout = setTimeout(() => {
-            if (replayData) requestSimulation(false);
+            if (replayData || isDirty) requestSimulation(false);
         }, 500); // 500ms debounce
     }
     function undo() { 
@@ -549,6 +566,24 @@
         return entities;
     }
 
+    function getSnappedPos(x, y, w, h) {
+        if (w < 1) {
+            // Units: Snap center to 0.5 increments (edges or centers of tiles)
+            return {
+                x: Math.round(x * 2) / 2,
+                y: Math.round(y * 2) / 2
+            };
+        } else {
+            // Buildings: Snap top-left corner to nearest integer tile
+            const tx = Math.round(x - w / 2);
+            const ty = Math.round(y - h / 2);
+            return {
+                x: tx + w / 2,
+                y: ty + h / 2
+            };
+        }
+    }
+
     function getEntityRect(ent) {
         const d = UNIT_DEFS[ent.type] || { width: 1, height: 1 };
         const x = ent.x - d.width/2;
@@ -595,13 +630,13 @@
         }
 
         // Grid
-        ctx.strokeStyle = 'rgba(255,255,255,0.03)'; ctx.lineWidth = 0.5/scale;
+        ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 1.0/scale;
         ctx.beginPath();
         for(let i=0; i<=mapW; i++) { ctx.moveTo(i,0); ctx.lineTo(i,mapH); }
         for(let i=0; i<=mapH; i++) { ctx.moveTo(0,i); ctx.lineTo(mapW,i); }
         ctx.stroke();
 
-        ctx.strokeStyle = 'rgba(56,189,248,0.1)'; ctx.lineWidth = 1.5/scale;
+        ctx.strokeStyle = 'rgba(56,189,248,0.2)'; ctx.lineWidth = 1.5/scale;
         ctx.beginPath();
         for(let i=0; i<=mapW; i+=8) { ctx.moveTo(i,0); ctx.lineTo(i,mapH); }
         for(let i=0; i<=mapH; i+=8) { ctx.moveTo(0,i); ctx.lineTo(mapW,i); }
@@ -636,8 +671,14 @@
         if (currentTool !== 'cursor' && currentTool !== 'delete' && !isPanning) {
             const d = UNIT_DEFS[currentTool];
             const snap = document.getElementById('snap-grid').checked;
-            const center_x = snap ? Math.floor(mouseWorldPos.x) + d.width/2 : mouseWorldPos.x;
-            const center_y = snap ? Math.floor(mouseWorldPos.y) + d.height/2 : mouseWorldPos.y;
+            let center_x = mouseWorldPos.x;
+            let center_y = mouseWorldPos.y;
+            
+            if (snap) {
+                const snapped = getSnappedPos(center_x, center_y, d.width, d.height);
+                center_x = snapped.x;
+                center_y = snapped.y;
+            }
             
             ctx.fillStyle = currentOwner === 'p1' ? '#3b82f6' : (currentOwner === 'p2' ? '#ef4444' : '#eab308');
             if (currentTool === 'mineral_patch') ctx.fillStyle = '#00f2ff';
@@ -683,9 +724,46 @@
                 if (re) { curX = re.x; curY = re.y; }
             }
 
+            let currentWPs = [];
+            if (replayData && replayData[currentTick]) {
+                const re = replayData[currentTick].entities.find(ent => ent.id === t.entity);
+                if (re && re.waypoints) currentWPs = re.waypoints;
+            }
+
             const d = UNIT_DEFS[e.type];
-            ctx.beginPath(); ctx.setLineDash([2,2]); ctx.strokeStyle = 'rgba(56,189,248,0.6)'; ctx.lineWidth = 1/scale;
-            ctx.moveTo(curX, curY);
+            ctx.setLineDash([]); 
+            ctx.lineWidth = 1.5/scale;
+            
+            // DRAW FULL FUTURE TRAJECTORY FROM REPLAY (Segmented by phase)
+            let fullPath = [];
+            if (replayData) {
+                const currentSnap = replayData[currentTick] ? replayData[currentTick].entities.find(ent => ent.id === t.entity) : null;
+                const currentPhase = (currentSnap && currentSnap.action_details) ? currentSnap.action_details.phase : null;
+
+                // Look ahead from currentTick
+                for (let i = currentTick; i < replayData.length; i++) {
+                    const snap = replayData[i].entities.find(ent => ent.id === t.entity);
+                    if (snap) {
+                        // STOP if the phase changes (e.g. from moving to mining, or mining to returning)
+                        const phase = snap.action_details ? snap.action_details.phase : null;
+                        if (phase !== currentPhase) break;
+
+                        fullPath.push({ x: snap.x, y: snap.y });
+                    } else {
+                        break; 
+                    }
+                }
+            }
+
+                if (fullPath.length > 0) {
+                    ctx.beginPath();
+                    ctx.strokeStyle = 'rgba(56,189,248,0.5)'; // Fainter for the "planned" trail
+                    ctx.moveTo(fullPath[0].x, fullPath[0].y);
+                    for (let i = 1; i < fullPath.length; i++) {
+                        ctx.lineTo(fullPath[i].x, fullPath[i].y);
+                    }
+                    ctx.stroke();
+                }
 
             let targetX = null, targetY = null;
             let edgeX = null, edgeY = null;
@@ -693,43 +771,68 @@
             if (t.action.target && t.action.target.x !== undefined) {
                 targetX = t.action.target.x;
                 targetY = t.action.target.y;
-            } else if (t.action.target && t.action.target.id) {
-                const tar = entities.find(ent => ent.id === t.action.target.id);
-                if (tar) {
-                    // Line points to center for visual stability
-                    targetX = tar.x;
-                    targetY = tar.y;
-                    
-                    // Waypoint circle snaps to edge based on STARTING position for stability
-                    const td = UNIT_DEFS[tar.type] || { width: 1, height: 1 };
-                    const nearest = getNearestPointOnRect(e.x, e.y, tar.x, tar.y, td.width, td.height);
-                    edgeX = nearest.x;
-                    edgeY = nearest.y;
+            } else {
+                let actualTargetId = (t.action.target && t.action.target.id) ? t.action.target.id : null;
+                
+                // SPECIAL CASE: GatherAction might be returning to base
+                if (replayData && replayData[currentTick]) {
+                    const re = replayData[currentTick].entities.find(ent => ent.id === t.entity);
+                    if (re && re.action_details && re.action_details.type === 'GatherAction' && re.action_details.phase === 'returning') {
+                        // Find nearest base for THIS tick
+                        const bases = replayData[currentTick].entities.filter(ent => ent.owner_id === re.owner_id && ent.type === 'base');
+                        if (bases.length > 0) {
+                            const closest = bases.sort((a,b) => Math.hypot(a.x - re.x, a.y - re.y) - Math.hypot(b.x - re.x, b.y - re.y))[0];
+                            actualTargetId = closest.id;
+                        }
+                    }
+                }
+
+                if (actualTargetId) {
+                    const tar = entities.find(ent => ent.id === actualTargetId);
+                    if (tar) {
+                        targetX = tar.x;
+                        targetY = tar.y;
+                        
+                        const td = UNIT_DEFS[tar.type] || { width: 1, height: 1 };
+                        const startX = currentWPs.length > 0 ? currentWPs[currentWPs.length-1].x : curX;
+                        const startY = currentWPs.length > 0 ? currentWPs[currentWPs.length-1].y : curY;
+                        const nearest = getNearestPointOnRect(startX, startY, tar.x, tar.y, td.width, td.height);
+                        edgeX = nearest.x;
+                        edgeY = nearest.y;
+                    }
                 }
             }
 
             if (targetX !== null) {
-                ctx.lineTo(targetX, targetY);
+                const finalX = edgeX !== null ? edgeX : targetX;
+                const finalY = edgeY !== null ? edgeY : targetY;
+                ctx.lineTo(finalX, finalY);
                 ctx.stroke();
-                ctx.setLineDash([]);
                 
-                // Draw Waypoint Handle at the EDGE (if available) or target point
-                const wx = edgeX !== null ? edgeX : targetX;
-                const wy = edgeY !== null ? edgeY : targetY;
+                // Draw Waypoint Handle
                 ctx.fillStyle = selectedIds.includes(`wp_${t.entity}`) ? '#fff' : '#38bdf8';
-                ctx.beginPath(); ctx.arc(wx, wy, 0.4, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(finalX, finalY, 0.4, 0, Math.PI*2); ctx.fill();
             }
             ctx.setLineDash([]);
         });
 
+        ctx.restore(); // Restore camera transform before drawing UI overlays
+
         if (isSimulating) {
-            ctx.setTransform(1,0,0,1,0,0);
-            ctx.fillStyle = 'rgba(0,0,0,0.5)';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            // Non-blocking indicator in the corner
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
+            ctx.fillRect(10, canvas.height - 40, 160, 30);
             ctx.fillStyle = 'white';
-            ctx.font = 'bold 16px Inter, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText(playRequestedWhileSimulating ? 'Starting soon...' : 'Simulating...', canvas.width/2, canvas.height/2);
+            ctx.font = '10px Inter, sans-serif';
+            ctx.textAlign = 'left';
+            ctx.fillText(playRequestedWhileSimulating ? '⌛ Starting soon...' : '⌛ Calculating...', 20, canvas.height - 21);
+        } else if (isDirty) {
+            ctx.fillStyle = 'rgba(185, 28, 28, 0.8)';
+            ctx.fillRect(10, canvas.height - 40, 160, 30);
+            ctx.fillStyle = 'white';
+            ctx.font = '10px Inter, sans-serif';
+            ctx.textAlign = 'left';
+            ctx.fillText('⚡ Changes not rendered', 20, canvas.height - 21);
         }
     }
 
@@ -739,6 +842,9 @@
         if (e.button === 1 || (e.button === 0 && e.shiftKey)) { isPanning = true; lastMousePos = { x: sx, y: sy }; return; }
         const w = screenToWorld(e.clientX, e.clientY);
         
+        dragStartPos = { x: e.clientX, y: e.clientY };
+        hasMovedEnough = false;
+
         if (e.button === 2) {
             if (currentTool !== 'cursor') { setTool('cursor'); return; }
             if (selectedIds.length > 0) {
@@ -871,8 +977,11 @@
             } else {
                 const snap = document.getElementById('snap-grid').checked;
                 const d = UNIT_DEFS[currentTool];
-                const px = snap ? Math.floor(w.x) + d.width/2 : w.x;
-                const py = snap ? Math.floor(w.y) + d.height/2 : w.y;
+                let px = w.x, py = w.y;
+                if (snap) {
+                    const snapped = getSnappedPos(px, py, d.width, d.height);
+                    px = snapped.x; py = snapped.y;
+                }
                 entities.push({ id: `${currentTool}_${Date.now()}`, type: currentTool, owner: currentOwner, x: px, y: py });
                 selectedIds = [entities[entities.length-1].id]; saveState(); updateInspector();
             }
@@ -891,6 +1000,13 @@
             offsetY += sy - lastMousePos.y; 
             lastMousePos = { x: sx, y: sy }; 
         } else if (isDragging && selectedIds.length > 0) {
+            // DRAG THRESHOLD
+            if (!hasMovedEnough && dragStartPos) {
+                const dist = Math.hypot(e.clientX - dragStartPos.x, e.clientY - dragStartPos.y);
+                if (dist < 5) return;
+                hasMovedEnough = true;
+            }
+
             selectedIds.forEach(id => {
                 const snap = document.getElementById('snap-grid').checked;
                 if (id.startsWith('wp_')) {
@@ -905,10 +1021,14 @@
                 } else {
                     const ent = entities.find(e => e.id === id);
                     if (ent && dragOffsets[id]) {
-                        const targetX = world.x - dragOffsets[id].x;
-                        const targetY = world.y - dragOffsets[id].y;
-                        ent.x = snap ? Math.round(targetX) : targetX;
-                        ent.y = snap ? Math.round(targetY) : targetY;
+                        const d = UNIT_DEFS[ent.type];
+                        let nx = world.x - dragOffsets[id].x;
+                        let ny = world.y - dragOffsets[id].y;
+                        if (snap) {
+                            const snapped = getSnappedPos(nx, ny, d.width, d.height);
+                            nx = snapped.x; ny = snapped.y;
+                        }
+                        ent.x = nx; ent.y = ny;
                     }
                 }
             });
@@ -1222,6 +1342,7 @@
                 replayData = processReplay(r.history); 
                 navGrid = r.static_grid;
                 serverTickDuration = r.tick_duration || 0.1;
+                isDirty = false; // Render complete
                 
                 if (isInitial) {
                     isPlaying = false;
@@ -1241,6 +1362,7 @@
                 }
                 updatePlaybackUI();
                 updateUI();
+                if (!isInitial) showToast('Simulation updated ✓');
             } else if (isInitial) {
                 isSimulating = false;
                 updateUI();
@@ -1252,6 +1374,14 @@
             if (isInitial) alert('Simulation failed: ' + err.message); 
             else console.error("Background simulation failed:", err);
         }
+    }
+
+    function showToast(msg) {
+        console.log("Showing toast:", msg);
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 2500);
     }
 
     function processReplay(deltas) {

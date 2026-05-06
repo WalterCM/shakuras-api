@@ -18,8 +18,8 @@ entities:
 - id: scv_1777961900832
   type: scv
   owner: p1
-  x: 2.35
-  y: 9.35
+  x: 2.5
+  y: 9.5
 - id: mineral_patch_1777961936586
   type: mineral_patch
   owner: neutral
@@ -58,18 +58,18 @@ entities:
 - id: scv_1777961947935
   type: scv
   owner: p1
-  x: 3.35
-  y: 9.35
+  x: 3.5
+  y: 9.5
 - id: scv_1777961948470
   type: scv
   owner: p1
-  x: 4.35
-  y: 9.35
+  x: 4.5
+  y: 9.5
 - id: scv_1777961949629
   type: scv
   owner: p1
-  x: 5.35
-  y: 9.35
+  x: 5.5
+  y: 9.5
 - id: base_1777961988325
   type: base
   owner: p2
@@ -78,23 +78,23 @@ entities:
 - id: scv_1777961991380
   type: scv
   owner: p2
-  x: 53.35
-  y: 58.35
+  x: 53.5
+  y: 58.5
 - id: scv_1777961992258
   type: scv
   owner: p2
-  x: 54.35
-  y: 58.35
+  x: 54.5
+  y: 58.5
 - id: scv_1777961992828
   type: scv
   owner: p2
-  x: 55.35
-  y: 58.35
+  x: 55.5
+  y: 58.5
 - id: scv_1777961993620
   type: scv
   owner: p2
-  x: 56.35
-  y: 58.35
+  x: 56.5
+  y: 58.5
 - id: mineral_patch_1777961996912
   type: mineral_patch
   owner: neutral
@@ -252,30 +252,6 @@ triggers:
       x: -1.3189640831113554
       y: 1.6011559040024042
 - tick: 0
-  entity: scv_1777961900832
-  action:
-    type: gather
-    target:
-      id: mineral_patch_1777961895868
-- tick: 0
-  entity: scv_1777961947935
-  action:
-    type: gather
-    target:
-      id: mineral_patch_1777961937577
-- tick: 0
-  entity: scv_1777961948470
-  action:
-    type: gather
-    target:
-      id: mineral_patch_1777961939043
-- tick: 0
-  entity: scv_1777961949629
-  action:
-    type: gather
-    target:
-      id: mineral_patch_1777961940634
-- tick: 0
   entity: scv_1777961992828
   action:
     type: gather
@@ -299,3 +275,27 @@ triggers:
     type: gather
     target:
       id: mineral_patch_1777962005618
+- tick: 0
+  entity: scv_1777961900832
+  action:
+    type: gather
+    target:
+      id: mineral_patch_1777961895868
+- tick: 0
+  entity: scv_1777961947935
+  action:
+    type: gather
+    target:
+      id: mineral_patch_1777961937577
+- tick: 0
+  entity: scv_1777961948470
+  action:
+    type: gather
+    target:
+      id: mineral_patch_1777961939043
+- tick: 0
+  entity: scv_1777961949629
+  action:
+    type: gather
+    target:
+      id: mineral_patch_1777961940634

@@ -13,29 +13,70 @@ class AStarPathfinder:
         Finds a path from start_pos to end_pos using A* on the tile grid.
         Returns a list of Vector2D waypoints.
         """
-        start_tile = (int(start_pos.x), int(start_pos.y))
-        end_tile = (int(end_pos.x), int(end_pos.y))
+        # Use math.floor for more consistent tile mapping
+        start_tile = (math.floor(start_pos.x), math.floor(start_pos.y))
+        end_tile = (math.floor(end_pos.x), math.floor(end_pos.y))
 
         if start_tile == end_tile:
             return [end_pos]
 
-        # Priority queue for A*: (priority, current_tile)
-        # priority = g_score + heuristic
+        # Priority queue for A*: (f_score, h_score, current_tile)
+        # We include h_score as a tie-breaker to favor nodes closer to the goal
+        # when f_score is equal.
         open_set = []
-        heapq.heappush(open_set, (0, start_tile))
+        
+        # Heuristic: Octile distance for 8-neighbor grid
+        def heuristic(a, b):
+            dx = abs(a[0] - b[0])
+            dy = abs(a[1] - b[1])
+            # Cost of diagonal is sqrt(2) approx 1.414
+            # Cost of straight is 1.0
+            return (dx + dy) + (1.414 - 2) * min(dx, dy)
+
+        h_start = heuristic(start_tile, end_tile)
+        heapq.heappush(open_set, (h_start, h_start, start_tile))
         
         came_from = {}
         g_score = {start_tile: 0}
         
-        # Heuristic: Euclidean distance
-        def heuristic(a, b):
-            return math.sqrt((a[0] - b[0])**2 + (a[1] - b[1])**2)
+        # LOG: Incluimos el ID y un RADAR visual de 5x5 alrededor del inicio
+        
+        # AJUSTE: Si el destino está bloqueado, buscar la celda libre más cercana AL SCV
+        if self.grid.static_grid[end_tile[0]][end_tile[1]]:
+            best_alt = None
+            min_dist_sq = float('inf')
+            
+            # Buscamos en anillos concéntricos
+            for r in range(1, 5):
+                for dx in range(-r, r+1):
+                    for dy in range(-r, r+1):
+                        # Solo miramos el perímetro del cuadrado de radio r
+                        if abs(dx) < r and abs(dy) < r: continue
+                        
+                        alt_tile = (end_tile[0] + dx, end_tile[1] + dy)
+                        if 0 <= alt_tile[0] < self.width and 0 <= alt_tile[1] < self.height:
+                            if not self.grid.static_grid[alt_tile[0]][alt_tile[1]]:
+                                # Calculamos distancia al SCV (start_pos)
+                                dist_sq = (alt_tile[0] + 0.5 - start_pos.x)**2 + (alt_tile[1] + 0.5 - start_pos.y)**2
+                                if dist_sq < min_dist_sq:
+                                    min_dist_sq = dist_sq
+                                    best_alt = alt_tile
+                if best_alt: break # Si encontramos opciones en este radio, nos quedamos con la mejor
+            
+            if best_alt:
+                end_tile = best_alt
+
+
+        # Si ya estamos en la celda de destino, no hace falta calcular nada
+        if start_tile == end_tile:
+            return []
 
         while open_set:
-            _, current = heapq.heappop(open_set)
+            f, h, current = heapq.heappop(open_set)
 
             if current == end_tile:
-                return self._reconstruct_path(came_from, current, end_pos, start_pos)
+                path = self._reconstruct_path(came_from, current, end_pos, start_pos)
+                return path
 
             # Check 8 neighbors
             for dx in [-1, 0, 1]:
@@ -48,27 +89,26 @@ class AStarPathfinder:
                     if not (0 <= neighbor[0] < self.width and 0 <= neighbor[1] < self.height):
                         continue
                     
-                    # Check if neighbor is blocked
-                    # We use is_area_blocked but only for the tile center to keep A* simple
-                    if self.grid.static_grid[neighbor[0]][neighbor[1]]:
+                    is_blocked = self.grid.static_grid[neighbor[0]][neighbor[1]]
+                    if is_blocked:
                         continue
-
-                    # Diagonal movement check (prevent cutting corners of solid blocks)
+                    
                     if dx != 0 and dy != 0:
                         if self.grid.static_grid[current[0] + dx][current[1]] or \
                            self.grid.static_grid[current[0]][current[1] + dy]:
                             continue
 
-                    # Tentative g_score
-                    # Cost is 1.0 for orthogonal, 1.414 for diagonal
                     move_cost = 1.414 if dx != 0 and dy != 0 else 1.0
                     tentative_g_score = g_score[current] + move_cost
                     
                     if neighbor not in g_score or tentative_g_score < g_score[neighbor]:
                         came_from[neighbor] = current
                         g_score[neighbor] = tentative_g_score
-                        f_score = tentative_g_score + heuristic(neighbor, end_tile)
-                        heapq.heappush(open_set, (f_score, neighbor))
+                        h_neighbor = heuristic(neighbor, end_tile)
+                        
+                        # Weight h by 0.8 to make it more like Dijkstra (explores more)
+                        f_score = tentative_g_score + (h_neighbor * 0.8)
+                        heapq.heappush(open_set, (f_score, h_neighbor, neighbor))
 
         # No path found
         return []
@@ -128,8 +168,8 @@ class AStarPathfinder:
         direction = diff.normalize()
         
         # Step along the line and check for collisions
-        # Use a step size related to tile size to ensure no wall is missed
-        step = 0.5
+        # Use a very small step size (0.1) to ensure no corners or narrow walls are skipped
+        step = 0.1
         d = step
         while d < dist:
             check_pos = p1 + direction * d

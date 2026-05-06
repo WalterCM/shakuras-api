@@ -98,15 +98,28 @@ class GatherAction(Action):
             return
         # Pathfinding for long distances
         if not entity.waypoints and entity.pos.dist_to(patch.pos) > 5.0:
-            raw_path = game_state.pathfinder.find_path(entity.pos, patch.pos, entity=entity)
+            # Calculamos el punto del perimetro mas cercano una sola vez para el A*
+            target_pos = get_nearest_point_on_rect(entity.pos, patch.pos, patch.width, patch.height)
+            raw_path = game_state.pathfinder.find_path(entity.pos, target_pos, entity=entity)
             if raw_path:
-                entity.waypoints = game_state.pathfinder.smooth_path(raw_path, entity, game_state)
+                full_path = [entity.pos] + raw_path
+                smoothed = game_state.pathfinder.smooth_path(full_path, entity, game_state)
+                if len(smoothed) > 1:
+                    smoothed.pop(0)
+                entity.waypoints = smoothed
         
         # Follow path or move towards nearest point
         if entity.waypoints:
             target = entity.waypoints[0]
             dt = game_state.tick_duration
-            arrival_threshold = entity.speed * dt * 1.1
+            arrival_threshold = entity.speed * dt * 1.5 # Relaxed threshold
+
+            # Check for path obstruction
+            if game_state.nav_grid.is_area_blocked(target.x, target.y, entity.width, entity.height, check_dynamic=False, entity=entity):
+                # Path blocked - recalculate soon
+                entity.waypoints = []
+                return
+
             if entity.pos.dist_to(target) < arrival_threshold:
                 entity.waypoints.pop(0)
                 if entity.waypoints:
@@ -170,17 +183,35 @@ class GatherAction(Action):
             return
 
         # Follow path if we have one
+        if not entity.waypoints and entity.pos.dist_to(closest_base.pos) > 5.0:
+            # Usar punto del perimetro mas cercano como destino estable
+            target_pos = get_nearest_point_on_rect(entity.pos, closest_base.pos, closest_base.width, closest_base.height)
+            raw_path = game_state.pathfinder.find_path(entity.pos, target_pos, entity=entity)
+            if raw_path:
+                full_path = [entity.pos] + raw_path
+                smoothed = game_state.pathfinder.smooth_path(full_path, entity, game_state)
+                if len(smoothed) > 1:
+                    smoothed.pop(0)
+                entity.waypoints = smoothed
+
         if entity.waypoints:
             target = entity.waypoints[0]
             dt = game_state.tick_duration
-            arrival_threshold = entity.speed * dt * 1.1
+            arrival_threshold = entity.speed * dt * 1.5 # Relaxed threshold
+            
+            # Check for path obstruction
+            if game_state.nav_grid.is_area_blocked(target.x, target.y, entity.width, entity.height, check_dynamic=False, entity=entity):
+                # Path blocked by another unit - Force recalculate soon
+                entity.waypoints = []
+                return
+
             if entity.pos.dist_to(target) < arrival_threshold:
                 entity.waypoints.pop(0)
                 if entity.waypoints:
                     target = entity.waypoints[0]
             entity.move_towards(target, game_state, ignore_static_id=closest_base.id)
         else:
-            # Keep moving - target the nearest edge of the base
+            # Move towards the base directly if very close or no path found
             target_pos = get_nearest_point_on_rect(entity.pos, closest_base.pos, closest_base.width, closest_base.height)
             entity.move_towards(target_pos, game_state, ignore_static_id=closest_base.id)
     def _find_best_patch(self, entity, game_state, max_dist=30.0, only_unoccupied=False):

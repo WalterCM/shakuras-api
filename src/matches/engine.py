@@ -101,7 +101,7 @@ class NavigationGrid:
             return True
         return False
     
-    def is_area_blocked(self, x, y, width, height, check_dynamic=True, entity=None, eps=0.2, ignore_static_id=None):
+    def is_area_blocked(self, x, y, width, height, check_dynamic=True, entity=None, eps=0.05, ignore_static_id=None):
         """Checks if a rectangular area is partially or fully blocked."""
         x1, y1 = math.floor(x - width/2 + eps), math.floor(y - height/2 + eps)
         x2, y2 = math.floor(x + width/2 - eps), math.floor(y + height/2 - eps)
@@ -124,8 +124,11 @@ class NavigationGrid:
                 self.dynamic_grid[x][y] = None
 
     def set_static_rect(self, x, y, width, height, entity_id):
-        x1, y1 = math.floor(x - width/2 + 0.01), math.floor(y - height/2 + 0.01)
-        x2, y2 = math.floor(x + width/2 - 0.01), math.floor(y + height/2 - 0.01)
+        # Use a slightly larger epsilon to ensure we don't over-occupy adjacent tiles due to float precision
+        eps = 0.05
+        x1, y1 = math.floor(x - width/2 + eps), math.floor(y - height/2 + eps)
+        x2 = math.floor(x + width/2 - eps)
+        y2 = math.floor(y + height/2 - eps)
         for ox in range(x1, x2 + 1):
             for oy in range(y1, y2 + 1):
                 if 0 <= ox < self.width and 0 <= oy < self.height:
