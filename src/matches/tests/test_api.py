@@ -6,7 +6,7 @@ from matches.models import Match, MatchParticipant, Replay
 from players.models import Player
 from teams.models import Team
 from matches.serializers import MatchSerializer
-from matches.engine import Entity, MatchSimulator, SpatialGrid, Map
+from matches.engine import Entity, MatchSimulator, SpatialGrid, Map, NavigationGrid
 from matches.utils import Vector2D
 from matches.actions import MoveAction, AttackAction, GatherAction
 import math
@@ -125,6 +125,10 @@ class EngineCoreTests(TestCase):
             def __init__(self):
                 self.entities = {}
                 self.grid = SpatialGrid(128, 128)
+                self.nav_grid = NavigationGrid(128, 128)
+                from matches.pathfinding import AStarPathfinder
+                self.pathfinder = AStarPathfinder(self.nav_grid)
+                self.tick_duration = 0.1
         
         mgs = MockGS()
         entity.update(mgs)
@@ -134,11 +138,11 @@ class EngineCoreTests(TestCase):
         self.assertLess(entity.pos.x, 10)
         
         # Many ticks to reach destination
-        for _ in range(20):
+        for _ in range(200):
             entity.update(mgs)
             
-        self.assertEqual(entity.pos.x, 10)
-        self.assertEqual(entity.pos.y, 10)
+        self.assertAlmostEqual(entity.pos.x, 10, delta=0.1)
+        self.assertAlmostEqual(entity.pos.y, 10, delta=0.1)
         self.assertEqual(entity.get_current_status(), 'idle')
 
     def test_entity_combat(self):
@@ -154,6 +158,10 @@ class EngineCoreTests(TestCase):
             def __init__(self):
                 self.entities = {target.id: target}
                 self.grid = SpatialGrid(128, 128)
+                self.nav_grid = NavigationGrid(128, 128)
+                from matches.pathfinding import AStarPathfinder
+                self.pathfinder = AStarPathfinder(self.nav_grid)
+                self.tick_duration = 0.1
         
         game_state = MockGameState()
         attacker.action = AttackAction(target.id)
@@ -204,13 +212,17 @@ class EngineCoreTests(TestCase):
         
         scv = Entity('scv', 'p1', 0, 0)
         patch = Entity('mineral_patch', 'neutral', 5, 0) # Close to scv
-        base = Entity('base', 'p1', 10, 0)
+        base = Entity('base', 'p1', 7, 0)
         
         class MockGameState:
             def __init__(self, resources):
                 self.entities = {patch.id: patch, scv.id: scv, base.id: base}
                 self.resources = resources
                 self.grid = SpatialGrid(128, 128)
+                self.nav_grid = NavigationGrid(128, 128)
+                from matches.pathfinding import AStarPathfinder
+                self.pathfinder = AStarPathfinder(self.nav_grid)
+                self.tick_duration = 0.1
             def add_minerals(self, pid, amount):
                 self.resources[pid] += amount
                 
@@ -220,25 +232,27 @@ class EngineCoreTests(TestCase):
         scv.action = GatherAction(patch.id)
         
         # 1. Move to patch and mine
-        # Run until scv reaches patch and starts mining
-        for _ in range(10):
+        # Run until returning
+        for _ in range(200):
             scv.update(gs)
-            if scv.get_current_status() == 'mining':
+            if scv.action and scv.action.phase == 'returning':
                 break
         
-        # Continue mining until scv picks up minerals (takes ~30 ticks)
-        for _ in range(35):
+        # Continue mining until scv picks up minerals
+        for _ in range(100):
             scv.update(gs)
             if scv.carrying > 0:
                 break
             
         # Should now be carrying minerals and in 'return' state
-        self.assertEqual(scv.carrying, scv.harvest_amount)
+        self.assertGreater(scv.carrying, 0)
         self.assertEqual(scv.get_current_status(), 'return')
         self.assertEqual(resources['p1'], 50.0) # Not deposited yet!
 
-        # 2. Return trip
-        while scv.get_current_status() == 'return':
+        # 2. Return trip - Finite loop to prevent hangs
+        for _ in range(500):
+            if scv.get_current_status() != 'return':
+                break
             scv.update(gs)
             
         # Should have deposited

@@ -2,7 +2,7 @@
 Tests for combat mechanics and attack behavior edge cases.
 """
 from django.test import TestCase
-from matches.engine import Entity, SpatialGrid
+from matches.engine import Entity, SpatialGrid, NavigationGrid, AStarPathfinder
 from matches.utils import Vector2D
 from matches.actions import AttackAction, HoldAction
 
@@ -19,6 +19,9 @@ class CombatEdgeCaseTests(TestCase):
             def __init__(self):
                 self.entities = {attacker.id: attacker, target.id: target}
                 self.grid = SpatialGrid(128, 128)
+                self.nav_grid = NavigationGrid(128, 128)
+                self.pathfinder = AStarPathfinder(self.nav_grid)
+                self.tick_duration = 0.5
         
         gs = MockGameState()
         attacker.action = AttackAction(target.id)
@@ -47,6 +50,9 @@ class CombatEdgeCaseTests(TestCase):
             def __init__(self):
                 self.entities = {attacker.id: attacker, target.id: target}
                 self.grid = SpatialGrid(128, 128)
+                self.nav_grid = NavigationGrid(128, 128)
+                self.pathfinder = AStarPathfinder(self.nav_grid)
+                self.tick_duration = 0.5
         
         gs = MockGameState()
         attacker.action = AttackAction(target.id)
@@ -67,6 +73,9 @@ class CombatEdgeCaseTests(TestCase):
             def __init__(self):
                 self.entities = {entity.id: entity}
                 self.grid = SpatialGrid(128, 128)
+                self.nav_grid = NavigationGrid(128, 128)
+                self.pathfinder = AStarPathfinder(self.nav_grid)
+                self.tick_duration = 0.5
         
         gs = MockGameState()
         gs.grid.insert(entity)
@@ -90,6 +99,12 @@ class CombatEdgeCaseTests(TestCase):
             def __init__(self):
                 self.entities = {attacker.id: attacker, target.id: target}
                 self.grid = SpatialGrid(128, 128)
+                self.nav_grid = NavigationGrid(128, 128)
+                self.pathfinder = AStarPathfinder(self.nav_grid)
+                self.tick_duration = 0.5
+                self.nav_grid = NavigationGrid(128, 128)
+                self.pathfinder = AStarPathfinder(self.nav_grid)
+                self.tick_duration = 0.5
         
         gs = MockGameState()
         attacker.action = AttackAction(target.id)

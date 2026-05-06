@@ -2,7 +2,7 @@
 Tests for harvesting mechanics and resource gathering.
 """
 from django.test import TestCase
-from matches.engine import Entity, SpatialGrid
+from matches.engine import Entity, SpatialGrid, NavigationGrid
 from matches.actions import GatherAction
 
 
@@ -20,7 +20,11 @@ class HarvestingTests(TestCase):
             def __init__(self):
                 self.entities = {scv.id: scv, patch.id: patch, base.id: base}
                 self.grid = SpatialGrid(128, 128)
+                self.nav_grid = NavigationGrid(128, 128)
                 self.resources = {'p1': 0}
+                self.tick_duration = 0.5
+                from matches.pathfinding import AStarPathfinder
+                self.pathfinder = AStarPathfinder(self.nav_grid)
             def add_minerals(self, pid, amount):
                 self.resources[pid] += amount
         
@@ -65,7 +69,11 @@ class HarvestingTests(TestCase):
             def __init__(self):
                 self.entities = {scv.id: scv, patch.id: patch, base.id: base}
                 self.grid = SpatialGrid(128, 128)
+                self.nav_grid = NavigationGrid(128, 128)
                 self.resources = {'p1': 0}
+                self.tick_duration = 0.5
+                from matches.pathfinding import AStarPathfinder
+                self.pathfinder = AStarPathfinder(self.nav_grid)
             def add_minerals(self, pid, amount):
                 self.resources[pid] += amount
         
@@ -76,7 +84,8 @@ class HarvestingTests(TestCase):
         self.assertEqual(scv.action.phase, 'moving_to_patch')
         
         # Run until mining
-        for _ in range(10):
+        # Dist 3.5 / Speed 1.0 / dt 0.5 ~ 7 ticks
+        for _ in range(15):
             scv.update(gs)
             if scv.action and scv.action.phase == 'mining':
                 break
@@ -85,7 +94,7 @@ class HarvestingTests(TestCase):
         self.assertEqual(patch.occupied_by, scv.id)
         
         # Run until returning
-        for _ in range(35):
+        for _ in range(200):
             scv.update(gs)
             if scv.action and scv.action.phase == 'returning':
                 break
@@ -114,7 +123,11 @@ class HarvestingTests(TestCase):
             def __init__(self):
                 self.entities = {'w1': scv, 'patch1': patch, 'base1': base}
                 self.grid = SpatialGrid(128, 128)
+                self.nav_grid = NavigationGrid(128, 128)
                 self.resources = {'p1': 0}
+                self.tick_duration = 0.5
+                from matches.pathfinding import AStarPathfinder
+                self.pathfinder = AStarPathfinder(self.nav_grid)
             def add_minerals(self, pid, amount):
                 self.resources[pid] += amount
         
@@ -125,7 +138,8 @@ class HarvestingTests(TestCase):
         self.assertIsNone(patch.occupied_by)
         
         # Run until scv reaches patch
-        for _ in range(10):
+        # Dist 3.5 / Speed 1.0 / dt 0.5 ~ 7 ticks
+        for _ in range(15):
             scv.action.update(scv, gs)
             if scv.action.phase == 'mining':
                 break
@@ -135,7 +149,8 @@ class HarvestingTests(TestCase):
         
         # Wait for mining to complete and verify patch is released
         released_during_return = False
-        for _ in range(50):
+        # Mining 25 ticks. Giving 100 to be safe.
+        for _ in range(100):
             if scv.action:
                 prev_phase = scv.action.phase
                 scv.action.update(scv, gs)
@@ -157,7 +172,11 @@ class HarvestingTests(TestCase):
             def __init__(self):
                 self.entities = {'w1': w1, 'w2': w2, 'patch1': patch1, 'patch2': patch2}
                 self.grid = SpatialGrid(128, 128)
+                self.nav_grid = NavigationGrid(128, 128)
                 self.resources = {'p1': 0}
+                self.tick_duration = 0.5
+                from matches.pathfinding import AStarPathfinder
+                self.pathfinder = AStarPathfinder(self.nav_grid)
             def add_minerals(self, pid, amount):
                 self.resources[pid] += amount
         
@@ -175,9 +194,12 @@ class HarvestingTests(TestCase):
         
         self.assertEqual(patch1.occupied_by, w1.id)
         
-        # Now w2 tries to reach patch1 but should retarget
-        for _ in range(5):
+        # Now w2 tries to reach patch1. It only retargets ON ARRIVAL.
+        # Dist was ~7 tiles. It needs ~14 ticks at speed 1.0/dt 0.5.
+        for _ in range(20):
             w2.action.update(w2, gs)
+            if w2.action.target_patch_id == patch2.id:
+                break
         
         # W2 should have retargeted to patch2
         self.assertEqual(w2.action.target_patch_id, patch2.id)
@@ -192,7 +214,11 @@ class HarvestingTests(TestCase):
             def __init__(self):
                 self.entities = {'w1': w1, 'w2': w2, 'patch1': patch}
                 self.grid = SpatialGrid(128, 128)
+                self.nav_grid = NavigationGrid(128, 128)
                 self.resources = {'p1': 0}
+                self.tick_duration = 0.5
+                from matches.pathfinding import AStarPathfinder
+                self.pathfinder = AStarPathfinder(self.nav_grid)
             def add_minerals(self, pid, amount):
                 self.resources[pid] += amount
         
@@ -231,7 +257,11 @@ class HarvestingTests(TestCase):
             def __init__(self):
                 self.entities = {'w1': w1, 'w2': w2, 'patch1': patch, 'base': base}
                 self.grid = SpatialGrid(128, 128)
+                self.nav_grid = NavigationGrid(128, 128)
                 self.resources = {'p1': 0}
+                self.tick_duration = 0.5
+                from matches.pathfinding import AStarPathfinder
+                self.pathfinder = AStarPathfinder(self.nav_grid)
             def add_minerals(self, pid, amount):
                 self.resources[pid] += amount
         

@@ -18,6 +18,7 @@ class GridCollisionTests(TestCase):
             self.resources = {'p1': 0, 'p2': 0}
             self.width = width
             self.height = height
+            self.tick_duration = 0.5
         
         def _spawn_entity(self, entity):
             self.entities[entity.id] = entity

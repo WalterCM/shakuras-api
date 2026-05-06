@@ -2,7 +2,7 @@
 Tests for movement, collision, and spatial grid mechanics.
 """
 from django.test import TestCase
-from matches.engine import Entity, SpatialGrid
+from matches.engine import Entity, SpatialGrid, NavigationGrid, AStarPathfinder
 from matches.utils import Vector2D
 from matches.actions import MoveAction
 
@@ -19,6 +19,9 @@ class MovementAndCollisionTests(TestCase):
             def __init__(self):
                 self.entities = {entity.id: entity}
                 self.grid = SpatialGrid(128, 128)
+                self.nav_grid = NavigationGrid(128, 128)
+                self.pathfinder = AStarPathfinder(self.nav_grid)
+                self.tick_duration = 0.5
         
         gs = MockGameState()
         entity.update(gs)
@@ -38,6 +41,9 @@ class MovementAndCollisionTests(TestCase):
             def __init__(self):
                 self.entities = {marine.id: marine, scv.id: scv}
                 self.grid = SpatialGrid(128, 128)
+                self.nav_grid = NavigationGrid(128, 128)
+                self.pathfinder = AStarPathfinder(self.nav_grid)
+                self.tick_duration = 0.5
         
         gs = MockGameState()
         gs.grid.insert(marine)

@@ -3,6 +3,7 @@ Action system for unit behaviors.
 Each action class represents a command button in StarCraft.
 """
 from abc import ABC, abstractmethod
+import math
 from .utils import rect_dist, get_nearest_point_on_rect
 
 
@@ -66,8 +67,8 @@ class GatherAction(Action):
         # Move towards patch
         actual_dist = rect_dist(entity.pos, entity.width, entity.height, patch.pos, patch.width, patch.height)
         
-        dt = game_state.tick_duration
-        arrival_threshold = entity.speed * dt * 1.1 
+        dt = getattr(game_state, 'tick_duration', 0.1)
+        arrival_threshold = entity.speed * dt * 1.5 
         
         if actual_dist <= entity.range + arrival_threshold:
             # Arrived at patch - check if we should stay or look for a free one
@@ -76,47 +77,42 @@ class GatherAction(Action):
                 patch.occupied_by = entity.id
                 self.phase = 'mining'
                 self.mining_cooldown = max(1, entity.harvest_time)
+                entity.waypoints = []
+                return
             else:
                 # It's occupied. Can we find a completely free one nearby?
-                # This mirrors the "it checks the status only after reaching it" logic
                 better_patch_id = self._find_best_patch(entity, game_state, only_unoccupied=True)
                 if better_patch_id and better_patch_id != self.target_patch_id:
                     self.target_patch_id = better_patch_id
-                    # We don't start mining immediately, we have to travel to the new one
                 else:
-                    # No free ones nearby? Just wait here (Saturation)
-                    # Stay in 'moving_to_patch' phase so it shows as 'harvest' status
-                    # but don't move - waiting for patch to free up
+                    # Saturation: wait here
                     pass
-        # Check actual geometric distance to perimeter
-        dist = rect_dist(entity.pos, entity.width, entity.height, patch.pos, patch.width, patch.height)
-        if dist <= arrival_threshold:
-            # We are touching! Start mining
-            self.phase = 'mining'
-            self.mining_cooldown = max(1, entity.harvest_time)
-            entity.waypoints = []
-            return
+
         # Pathfinding for long distances
         if not entity.waypoints and entity.pos.dist_to(patch.pos) > 5.0:
-            # Calculamos el punto del perimetro mas cercano una sola vez para el A*
             target_pos = get_nearest_point_on_rect(entity.pos, patch.pos, patch.width, patch.height)
-            raw_path = game_state.pathfinder.find_path(entity.pos, target_pos, entity=entity)
+            raw_path = game_state.pathfinder.find_path(entity.pos, target_pos, entity=entity, game_state=game_state)
             if raw_path:
                 full_path = [entity.pos] + raw_path
                 smoothed = game_state.pathfinder.smooth_path(full_path, entity, game_state)
                 if len(smoothed) > 1:
                     smoothed.pop(0)
                 entity.waypoints = smoothed
-        
-        # Follow path or move towards nearest point
+
         if entity.waypoints:
             target = entity.waypoints[0]
-            dt = game_state.tick_duration
-            arrival_threshold = entity.speed * dt * 1.5 # Relaxed threshold
+            # Immunity setup
+            ignore_ids = [patch.id]
+            bases = [e for e in game_state.entities.values() if e.type == 'base' and e.owner_id == entity.owner_id]
+            closest_base = min(bases, key=lambda b: entity.pos.dist_to_sq(b.pos)) if bases else None
+            if closest_base and entity.pos.dist_to(closest_base.pos) < 5.0:
+                ignore_ids.append(closest_base.id)
 
-            # Check for path obstruction
-            if game_state.nav_grid.is_area_blocked(target.x, target.y, entity.width, entity.height, check_dynamic=False, entity=entity):
-                # Path blocked - recalculate soon
+            ignore_cats = ['resource', 'building'] if actual_dist < 1.0 else None
+            
+            # Check for path obstruction if nav_grid is available
+            nav_grid = getattr(game_state, 'nav_grid', None)
+            if nav_grid and len(entity.waypoints) > 1 and nav_grid.is_area_blocked(target.x, target.y, entity.width, entity.height, check_dynamic=False, entity=entity, ignore_static_id=ignore_ids, ignore_categories=ignore_cats, game_state=game_state, eps=0.15):
                 entity.waypoints = []
                 return
 
@@ -124,11 +120,13 @@ class GatherAction(Action):
                 entity.waypoints.pop(0)
                 if entity.waypoints:
                     target = entity.waypoints[0]
-            entity.move_towards(target, game_state, ignore_static_id=patch.id)
+
+            entity.move_towards(target, game_state, ignore_static_id=ignore_ids, ignore_categories=ignore_cats)
         else:
-            # Move towards the NEAREST POINT on the patch perimeter
             target_pos = get_nearest_point_on_rect(entity.pos, patch.pos, patch.width, patch.height)
-            entity.move_towards(target_pos, game_state, ignore_static_id=patch.id)
+            ignore_ids = [patch.id]
+            ignore_cats = ['resource', 'building'] if actual_dist < 1.0 else None
+            entity.move_towards(target_pos, game_state, ignore_static_id=ignore_ids, ignore_categories=ignore_cats)
     
     def _mine(self, entity, game_state):
         patch = game_state.entities.get(self.target_patch_id)
@@ -136,23 +134,17 @@ class GatherAction(Action):
             self.phase = 'moving_to_patch'
             return
 
-        # Check if we can start/continue mining
         if patch.occupied_by is not None and patch.occupied_by != entity.id:
-            # Someone else is mining - wait
             return
             
-        # Claim it if we were waiting
-        # Claim it if we were waiting
         if patch.occupied_by is None:
             patch.occupied_by = entity.id
             self.mining_cooldown = max(1, entity.harvest_time)
 
-        # Wait for mining to complete
         if self.mining_cooldown > 0:
             self.mining_cooldown -= 1
             return
         
-        # Mining complete - pick up minerals and release patch
         patch.hp -= entity.harvest_amount
         entity.carrying = entity.harvest_amount
         entity.last_patch_id = patch.id
@@ -160,7 +152,6 @@ class GatherAction(Action):
         self.phase = 'returning'
     
     def _return_to_base(self, entity, game_state):
-        # Find nearest base
         bases = [e for e in game_state.entities.values()
                 if e.owner_id == entity.owner_id and e.type == 'base' and e.status != 'dead']
         
@@ -170,23 +161,21 @@ class GatherAction(Action):
             return
         
         closest_base = min(bases, key=lambda b: entity.pos.dist_to_sq(b.pos))
-        
-        # Move towards base
         actual_dist = rect_dist(entity.pos, entity.width, entity.height, closest_base.pos, closest_base.width, closest_base.height)
         
         if actual_dist <= 0.1:
-            # Arrived - deposit minerals
             game_state.add_minerals(entity.owner_id, entity.carrying)
             entity.carrying = 0
             self.phase = 'moving_to_patch'
             entity.waypoints = []
             return
 
-        # Follow path if we have one
+        dt = getattr(game_state, 'tick_duration', 0.1)
+        arrival_threshold = entity.speed * dt * 1.5 
+
         if not entity.waypoints and entity.pos.dist_to(closest_base.pos) > 5.0:
-            # Usar punto del perimetro mas cercano como destino estable
             target_pos = get_nearest_point_on_rect(entity.pos, closest_base.pos, closest_base.width, closest_base.height)
-            raw_path = game_state.pathfinder.find_path(entity.pos, target_pos, entity=entity)
+            raw_path = game_state.pathfinder.find_path(entity.pos, target_pos, entity=entity, game_state=game_state)
             if raw_path:
                 full_path = [entity.pos] + raw_path
                 smoothed = game_state.pathfinder.smooth_path(full_path, entity, game_state)
@@ -196,12 +185,20 @@ class GatherAction(Action):
 
         if entity.waypoints:
             target = entity.waypoints[0]
-            dt = game_state.tick_duration
-            arrival_threshold = entity.speed * dt * 1.5 # Relaxed threshold
+            ignore_ids = [closest_base.id]
+            if entity.last_patch_id:
+                ignore_ids.append(entity.last_patch_id)
             
-            # Check for path obstruction
-            if game_state.nav_grid.is_area_blocked(target.x, target.y, entity.width, entity.height, check_dynamic=False, entity=entity):
-                # Path blocked by another unit - Force recalculate soon
+            dist_to_patch = 999
+            if entity.last_patch_id and entity.last_patch_id in game_state.entities:
+                patch = game_state.entities[entity.last_patch_id]
+                dist_to_patch = rect_dist(entity.pos, entity.width, entity.height, patch.pos, patch.width, patch.height)
+
+            ignore_cats = ['resource', 'building'] if (actual_dist < 1.0 or dist_to_patch < 1.0) else None
+
+            # Check for path obstruction if nav_grid is available
+            nav_grid = getattr(game_state, 'nav_grid', None)
+            if nav_grid and len(entity.waypoints) > 1 and nav_grid.is_area_blocked(target.x, target.y, entity.width, entity.height, check_dynamic=False, entity=entity, ignore_static_id=ignore_ids, ignore_categories=ignore_cats, game_state=game_state, eps=0.15):
                 entity.waypoints = []
                 return
 
@@ -209,40 +206,39 @@ class GatherAction(Action):
                 entity.waypoints.pop(0)
                 if entity.waypoints:
                     target = entity.waypoints[0]
-            entity.move_towards(target, game_state, ignore_static_id=closest_base.id)
+
+            entity.move_towards(target, game_state, ignore_static_id=ignore_ids, ignore_categories=ignore_cats)
         else:
-            # Move towards the base directly if very close or no path found
             target_pos = get_nearest_point_on_rect(entity.pos, closest_base.pos, closest_base.width, closest_base.height)
-            entity.move_towards(target_pos, game_state, ignore_static_id=closest_base.id)
+            ignore_ids = [closest_base.id]
+            if entity.last_patch_id:
+                ignore_ids.append(entity.last_patch_id)
+            
+            dist_to_patch = 999
+            if entity.last_patch_id and entity.last_patch_id in game_state.entities:
+                patch = game_state.entities[entity.last_patch_id]
+                dist_to_patch = rect_dist(entity.pos, entity.width, entity.height, patch.pos, patch.width, patch.height)
+
+            ignore_cats = ['resource', 'building'] if (actual_dist < 1.5 or dist_to_patch < 1.0) else None
+            entity.move_towards(target_pos, game_state, ignore_static_id=ignore_ids, ignore_categories=ignore_cats)
+
     def _find_best_patch(self, entity, game_state, max_dist=30.0, only_unoccupied=False):
-        """Find the best mineral patch considering distance and current scv assignments"""
-        patches = [e for e in game_state.entities.values()
-                  if e.type == 'mineral_patch' and e.hp > 0]
-        
-        # Locality: Filter by distance
+        patches = [e for e in game_state.entities.values() if e.type == 'mineral_patch' and e.hp > 0]
         if max_dist:
             patches = [p for p in patches if entity.pos.dist_to(p.pos) <= max_dist]
-            
         if not patches:
             return None
-            
-        # Count current assignments
         assigned_counts = {}
         for other in game_state.entities.values():
             if other.owner_id == entity.owner_id and other.type == 'scv' and isinstance(other.action, GatherAction):
                 tid = other.action.target_patch_id
                 assigned_counts[tid] = assigned_counts.get(tid, 0) + 1
-        
         if only_unoccupied:
-            # Look for a patch with 0 active miners (occupied_by is None)
             unoccupied = [p for p in patches if p.occupied_by is None]
             if unoccupied:
-                # Pick the closest unoccupied one
                 best = min(unoccupied, key=lambda p: entity.pos.dist_to_sq(p.pos))
                 return best.id
             return None
-
-        # Standard score: (assignment count, square distance)
         best = min(patches, key=lambda p: (assigned_counts.get(p.id, 0), entity.pos.dist_to_sq(p.pos)))
         return best.id
     
@@ -261,126 +257,66 @@ class GatherAction(Action):
 
 
 class AttackAction(Action):
-    """Attack a target unit (Attack button)"""
-    
     def __init__(self, target_id):
         self.target_id = target_id
-    
     def update(self, entity, game_state):
         target = game_state.entities.get(self.target_id)
-        
-        # Target dead or missing - stop attacking
         if not target or target.status == 'dead':
             entity.action = None
             return
-        
-        # Adjust distance for radii (edge-to-edge)
         actual_dist = rect_dist(entity.pos, entity.width, entity.height, target.pos, target.width, target.height)
-        
         if actual_dist <= entity.range:
-            # In range - attack if cooldown ready
             if entity.current_cooldown <= 0:
                 target.take_damage(entity.damage)
                 entity.current_cooldown = entity.cooldown
         else:
-            # Move into range
             if actual_dist > 5.0 and not entity.waypoints:
-                raw_path = game_state.pathfinder.find_path(entity.pos, target.pos, entity=entity)
+                raw_path = game_state.pathfinder.find_path(entity.pos, target.pos, entity=entity, game_state=game_state)
                 if raw_path:
                     entity.waypoints = game_state.pathfinder.smooth_path(raw_path, entity, game_state)
-
             if entity.waypoints:
                 wp = entity.waypoints[0]
                 if entity.pos.dist_to(wp) < 0.5:
                     entity.waypoints.pop(0)
-                    if entity.waypoints:
-                        wp = entity.waypoints[0]
+                    if entity.waypoints: wp = entity.waypoints[0]
                 entity.move_towards(wp, game_state)
             else:
                 target_pos = get_nearest_point_on_rect(entity.pos, target.pos, target.width, target.height)
                 entity.move_towards(target_pos, game_state)
-    
-    def get_status(self, entity=None, game_state=None):
-        return 'attack'
-
-    def to_dict(self):
-        return {
-            'type': 'AttackAction',
-            'target_id': self.target_id
-        }
+    def get_status(self, entity=None, game_state=None): return 'attack'
 
 
 class MoveAction(Action):
-    """Move to a destination (Move button)"""
-    
     def __init__(self, destination):
         self.destination = destination
-
-    def prepare(self, entity, game_state):
-        if not entity.waypoints:
-            raw_path = game_state.pathfinder.find_path(entity.pos, self.destination, entity=entity)
-            if raw_path:
-                entity.waypoints = game_state.pathfinder.smooth_path(raw_path, entity, game_state)
-            else:
-                entity.waypoints = [self.destination]
-    
     def update(self, entity, game_state):
-        # 1. Initialize path if needed
         if not entity.waypoints:
-            raw_path = game_state.pathfinder.find_path(entity.pos, self.destination, entity=entity)
+            raw_path = game_state.pathfinder.find_path(entity.pos, self.destination, entity=entity, game_state=game_state)
             if raw_path:
                 entity.waypoints = game_state.pathfinder.smooth_path(raw_path, entity, game_state)
             else:
-                # No path found or already at destination tile
                 entity.waypoints = [self.destination]
-
-        # 2. Check if we've reached the current waypoint
         target = entity.waypoints[0]
-        dt = game_state.tick_duration
+        dt = getattr(game_state, 'tick_duration', 0.1)
         arrival_threshold = entity.speed * dt * 1.1
-        dist = entity.pos.dist_to(target)
-        
-        if dist < arrival_threshold:
+        if entity.pos.dist_to(target) < arrival_threshold:
             entity.waypoints.pop(0)
             if not entity.waypoints:
                 entity.action = None
                 return
             target = entity.waypoints[0]
-
-        # 3. Move towards the current target (waypoint or final destination)
         entity.move_towards(target, game_state)
-    
-    def get_status(self, entity=None, game_state=None):
-        return 'move'
-
-    def to_dict(self):
-        return {
-            'type': 'MoveAction',
-            'destination': {'x': self.destination.x, 'y': self.destination.y}
-        }
+    def get_status(self, entity=None, game_state=None): return 'move'
 
 
 class HoldAction(Action):
-    """Hold position and attack nearby enemies (Hold button)"""
-    
     def update(self, entity, game_state):
-        # Don't move, but attack nearby enemies
-        enemies = [e for e in game_state.entities.values()
-                  if e.owner_id != entity.owner_id and e.status != 'dead'
-                  and e.type not in ['mineral_patch', 'base']]
-        
-        if not enemies:
-            return
-        
-        # Find closest enemy in range
-        in_range = [e for e in enemies 
-                   if entity.pos.dist_to(e.pos) <= entity.range]
-        
+        enemies = [e for e in game_state.entities.values() if e.owner_id != entity.owner_id and e.status != 'dead' and e.type not in ['mineral_patch', 'base']]
+        if not enemies: return
+        in_range = [e for e in enemies if entity.pos.dist_to(e.pos) <= entity.range]
         if in_range:
             target = min(in_range, key=lambda e: entity.pos.dist_to_sq(e.pos))
             if entity.current_cooldown <= 0:
                 target.take_damage(entity.damage)
                 entity.current_cooldown = entity.cooldown
-    
-    def get_status(self, entity=None, game_state=None):
-        return 'hold'
+    def get_status(self, entity=None, game_state=None): return 'hold'

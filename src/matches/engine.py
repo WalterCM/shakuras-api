@@ -101,7 +101,7 @@ class NavigationGrid:
             return True
         return False
     
-    def is_area_blocked(self, x, y, width, height, check_dynamic=True, entity=None, eps=0.05, ignore_static_id=None):
+    def is_area_blocked(self, x, y, width, height, check_dynamic=True, entity=None, eps=0.05, ignore_static_id=None, ignore_categories=None, game_state=None):
         """Checks if a rectangular area is partially or fully blocked."""
         x1, y1 = math.floor(x - width/2 + eps), math.floor(y - height/2 + eps)
         x2, y2 = math.floor(x + width/2 - eps), math.floor(y + height/2 - eps)
@@ -109,11 +109,30 @@ class NavigationGrid:
             for oy in range(y1, y2 + 1):
                 if ox < 0 or ox >= self.width or oy < 0 or oy >= self.height:
                     return True
-                if self.static_grid[ox][oy] and (not entity or self.static_grid[ox][oy] != entity.id):
+                
+                # Static Layer
+                static_id = self.static_grid[ox][oy]
+                if static_id and (not entity or static_id != entity.id):
                     # Check if we should ignore this specific static obstacle
-                    if ignore_static_id and self.static_grid[ox][oy] == ignore_static_id:
-                        continue
+                    if ignore_static_id:
+                        if isinstance(ignore_static_id, (list, tuple, set)):
+                            if static_id in ignore_static_id: continue
+                        elif static_id == ignore_static_id:
+                            continue
+                    
+                    # Check if we should ignore this CATEGORY of obstacle
+                    # This is CRITICAL for gathering units to pass through mineral clusters
+                    if ignore_categories and game_state:
+                        other = game_state.entities.get(static_id)
+                        if other:
+                            # Use .definition.get('category') or just .type depending on where it's stored
+                            category = other.definition.get('category') if hasattr(other, 'definition') else None
+                            if category in ignore_categories:
+                                continue
+
                     return True
+                
+                # Dynamic Layer
                 if check_dynamic and self.dynamic_grid[ox][oy] and (not entity or self.dynamic_grid[ox][oy] != entity.id):
                     return True
         return False
@@ -269,11 +288,11 @@ class Entity:
                 self.ghost_mode_ticks = 30
                 self.pos_memory = []
 
-    def move_towards(self, target_pos, game_state, ignore_static_id=None):
+    def move_towards(self, target_pos, game_state, ignore_static_id=None, ignore_categories=None):
         """Moves the entity towards a target position with grid-aware collision and sliding."""
         diff = target_pos - self.pos
         dist = diff.length()
-        dt = game_state.tick_duration
+        dt = getattr(game_state, 'tick_duration', 0.1)
         effective_speed = self.speed * (GAME_SPEED_MULTIPLIER if hasattr(self, 'speed') else 1.0)
         
         if dist < 0.01:
@@ -302,12 +321,14 @@ class Entity:
         
         from .actions import GatherAction
         am_gathering = isinstance(self.action, GatherAction)
-        # Gathering SCVs get a tiny bit of leniency to touch the edge properly
-        eps = 0.05 if am_gathering else 0.2
+        # Gathering SCVs get a lot more leniency (larger eps) to pass through 1-tile gaps
+        # and ignore "shoulder clipping" with neighbors.
+        eps = 0.15 if am_gathering else 0.2
 
-        # If we are ALREADY blocked at current position, something is wrong
-        if game_state.nav_grid.is_area_blocked(self.pos.x, self.pos.y, self.width, self.height, check_dynamic=False, entity=self, eps=eps):
-            self.ghost_mode_ticks = 30
+        # If we are ALREADY blocked at current position, check if we can ignore it
+        if game_state.nav_grid.is_area_blocked(self.pos.x, self.pos.y, self.width, self.height, check_dynamic=False, entity=self, eps=eps, ignore_static_id=ignore_static_id, ignore_categories=ignore_categories, game_state=game_state):
+            if not am_gathering:
+                self.ghost_mode_ticks = 30
 
         check_dynamic = (not am_gathering) and (self.ghost_mode_ticks <= 0)
         current_eps = 0.4 if self.ghost_mode_ticks > 0 else eps
@@ -316,14 +337,14 @@ class Entity:
         d = step
         while d <= probe_dist:
             check_pos = self.pos + direction * d
-            if game_state.nav_grid.is_area_blocked(check_pos.x, check_pos.y, self.width, self.height, check_dynamic=check_dynamic, entity=self, eps=current_eps, ignore_static_id=ignore_static_id):
+            if game_state.nav_grid.is_area_blocked(check_pos.x, check_pos.y, self.width, self.height, check_dynamic=check_dynamic, entity=self, eps=current_eps, ignore_static_id=ignore_static_id, ignore_categories=ignore_categories, game_state=game_state):
                 is_blocked = True
                 break
             d += step
             
         # ALWAYS check the exact move destination for safety
         dest_pos = self.pos + direction * move_dist
-        if not is_blocked and game_state.nav_grid.is_area_blocked(dest_pos.x, dest_pos.y, self.width, self.height, check_dynamic=check_dynamic, entity=self, eps=current_eps, ignore_static_id=ignore_static_id):
+        if not is_blocked and game_state.nav_grid.is_area_blocked(dest_pos.x, dest_pos.y, self.width, self.height, check_dynamic=check_dynamic, entity=self, eps=current_eps, ignore_static_id=ignore_static_id, ignore_categories=ignore_categories, game_state=game_state):
             is_blocked = True
         
         # If we're currently sliding, check if we've cleared the obstacle
@@ -333,16 +354,16 @@ class Entity:
                 self.slide_direction = None
                 self.pos += direction * move_dist
             else:
-                self.slide_logic(target_pos, game_state, ignore_static_id=ignore_static_id)
+                self.slide_logic(target_pos, game_state, ignore_static_id=ignore_static_id, ignore_categories=ignore_categories)
         elif is_blocked:
             # First time hitting obstacle, enter slide mode
-            self.slide_logic(target_pos, game_state, ignore_static_id=ignore_static_id)
+            self.slide_logic(target_pos, game_state, ignore_static_id=ignore_static_id, ignore_categories=ignore_categories)
         else:
             # No obstacle, move directly
             self.slide_direction = None
             self.pos += direction * move_dist
 
-    def slide_logic(self, target_pos, game_state, ignore_static_id=None):
+    def slide_logic(self, target_pos, game_state, ignore_static_id=None, ignore_categories=None):
         """Finds a tangent path around an obstacle and sticks to it.
         Uses a fan-sweep algorithm to smoothly follow walls and dive into gaps."""
         import math
@@ -362,11 +383,10 @@ class Entity:
             step = min(0.1, effective_speed * dt) # Scale search step
             d = step
             last_safe = 0
-            # Gathering SCVs get a tiny bit of leniency to touch the edge properly
-            eps = 0.05 if am_gathering else 0.2
+            eps = 0.15 if am_gathering else 0.2
             while d <= max_d:
                 p = self.pos + test_dir * d
-                if game_state.nav_grid.is_area_blocked(p.x, p.y, self.width, self.height, check_dynamic=not am_gathering, entity=self, eps=eps, ignore_static_id=ignore_static_id):
+                if game_state.nav_grid.is_area_blocked(p.x, p.y, self.width, self.height, check_dynamic=not am_gathering, entity=self, eps=eps, ignore_static_id=ignore_static_id, ignore_categories=ignore_categories, game_state=game_state):
                     break
                 last_safe = d
                 d += step
@@ -496,7 +516,8 @@ class Entity:
             dist = rect_dist(self.pos, self.width, self.height, other.pos, other.width, other.height)
             if dist <= 0: # Overlapping
                 # Repel with a force proportional to tick duration to avoid "variable speed" jumps
-                overlap_depth = REPULSION_FORCE_PER_SEC * game_state.tick_duration
+                dt = getattr(game_state, 'tick_duration', 0.1)
+                overlap_depth = REPULSION_FORCE_PER_SEC * dt
                 push_dir = (self.pos - other.pos).normalize()
                 if push_dir.length_sq() < 0.01:
                     push_dir = Vector2D(random.uniform(-1,1), random.uniform(-1,1)).normalize()

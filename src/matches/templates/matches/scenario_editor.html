@@ -732,13 +732,17 @@
 
             const d = UNIT_DEFS[e.type];
             ctx.setLineDash([]); 
-            ctx.lineWidth = 1.5/scale;
+            const currentLW = 2.0 / scale;
+            ctx.lineWidth = currentLW;
             
             // DRAW FULL FUTURE TRAJECTORY FROM REPLAY (Segmented by phase)
             let fullPath = [];
+            let actionType = 'move';
             if (replayData && !isDirty) {
                 const currentSnap = replayData[currentTick] ? replayData[currentTick].entities.find(ent => ent.id === t.entity) : null;
-                const currentPhase = (currentSnap && currentSnap.action_details) ? currentSnap.action_details.phase : null;
+                const details = (currentSnap && currentSnap.action_details) ? currentSnap.action_details : null;
+                const currentPhase = details ? details.phase : null;
+                actionType = details ? details.type : 'move';
 
                 // Look ahead from currentTick
                 for (let i = currentTick; i < replayData.length; i++) {
@@ -758,22 +762,22 @@
                 }
             }
 
+            const pathColor = (t.action.type === 'gather' || actionType === 'GatherAction') ? '#38bdf8' : '#ef4444';
             ctx.beginPath();
             if (fullPath.length > 0) {
-                ctx.strokeStyle = 'rgba(56,189,248,0.5)'; // Fainter for the "planned" trail
+                ctx.strokeStyle = pathColor + '80'; // 50% opacity for trail
                 ctx.moveTo(fullPath[0].x, fullPath[0].y);
                 for (let i = 1; i < fullPath.length; i++) {
                     ctx.lineTo(fullPath[i].x, fullPath[i].y);
                 }
                 ctx.stroke();
-                // Move to the end of the calculated path to continue with the target line
                 ctx.beginPath();
+                ctx.lineWidth = currentLW; // Re-apply to ensure consistency
                 ctx.moveTo(fullPath[fullPath.length-1].x, fullPath[fullPath.length-1].y);
             } else {
-                // If no calculated path (dirty or just starting), start from the current unit position
                 ctx.moveTo(curX, curY);
             }
-            ctx.strokeStyle = '#38bdf8';
+            ctx.strokeStyle = pathColor;
 
             let targetX = null, targetY = null;
             let edgeX = null, edgeY = null;
@@ -819,9 +823,9 @@
                 ctx.lineTo(finalX, finalY);
                 ctx.stroke();
                 
-                // Draw Waypoint Marker (Not a handle anymore)
-                ctx.fillStyle = '#38bdf8';
-                ctx.beginPath(); ctx.arc(finalX, finalY, 0.3, 0, Math.PI*2); ctx.fill();
+                // Draw Waypoint Marker
+                ctx.fillStyle = pathColor;
+                ctx.beginPath(); ctx.arc(finalX, finalY, 0.1, 0, Math.PI*2); ctx.fill();
             }
             ctx.setLineDash([]);
         });

@@ -17,14 +17,14 @@ class TestMapEditor:
 
     def test_editor_page_renders(self, client):
         """Test that the map editor page renders correctly"""
-        url = reverse('matches:map-editor')
+        url = reverse('matches:editor')
         response = client.get(url)
         assert response.status_code == 200
-        assert b"Map Editor" in response.content
+        assert b"Shakuras Editor" in response.content
 
     def test_save_map_api(self, client):
         """Test the save_map_view API endpoint creates a YAML file"""
-        url = reverse('matches:save-map')
+        url = reverse('matches:editor-save')
         payload = {
             'name': 'API Map',
             'width': 64,
